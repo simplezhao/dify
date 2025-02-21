@@ -1,0 +1,23 @@
+name: Pull and Push Image
+on:
+  workflow_dispatch:
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      
+    - name: checkout 
+      uses: actions/checkout@v4
+
+    - name: Run pull&push image.sh
+      env:
+        DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+        SWR_USER_NAME: ${{ secrets.SWR_USER_NAME }}
+        SWR_USER_PASSWORD: ${{ secrets.SWR_USER_PASSWORD }}
+      run: |
+        chmod +x ./docker/push_image.sh
+        ./docker/push_image.sh
