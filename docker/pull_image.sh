@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 自定义的 Docker 镜像服务地址
-DOCKER_REGISTRY="swr.cn-north-4.myhuaweicloud.com/difytool"
+DOCKER_REGISTRY=$DOCKER_REGISTRY
 TARGET_DIR="./"
 
 # 检查指定的文件夹是否存在
