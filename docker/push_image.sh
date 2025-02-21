@@ -1,10 +1,6 @@
 
 #!/bin/bash
 
-echo "Docker Registry: $DOCKER_REGISTRY"
-echo "Target Directory: $TARGET_DIR"
-echo "SWR_USER_NAME: $SWR_USER_NAME"
-
 docker login -u $SWR_USER_NAME -p $SWR_USER_PASSWORD  swr.cn-north-4.myhuaweicloud.com
 
 
