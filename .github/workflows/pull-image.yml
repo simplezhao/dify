@@ -1,0 +1,20 @@
+name: Pull Image
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pull_image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Run pull_image.sh
+        run: |
+          chmod +x ./docker/pull_image.sh
+          ./docker/pull_image.sh
