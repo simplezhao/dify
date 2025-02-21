@@ -4,6 +4,10 @@
 DOCKER_REGISTRY=$DOCKER_REGISTRY
 TARGET_DIR="./"
 
+echo "Docker Registry: $DOCKER_REGISTRY"
+echo "Target Directory: $TARGET_DIR"
+echo "SWR_USER_NAME: $SWR_USER_NAME"
+
 docker login -u $SWR_USER_NAME -p $SWR_USER_PASSWORD  $DOCKER_REGISTRY
 
 # 检查指定的文件夹是否存在
