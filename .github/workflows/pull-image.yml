@@ -1,5 +1,4 @@
-name: Docker Image CI
-
+name: Pull Image
 on:
   workflow_dispatch:
 
