@@ -15,7 +15,7 @@ jobs:
 
     - name: Log in to Docker Hub
       run: |
-        echo "${{ secrets.SWR_USER_PASSWORD }}" | docker login -u ${{ secrets.SWR_USER_NAME }} -p ${{ secrets.SWR_USER_PASSWORD }} ${{ secrets.DOCKER_REGISTRY }}
+        echo "${{ secrets.SWR_USER_PASSWORD }}" | docker login -u ${{ secrets.SWR_USER_NAME }} --password-stdin ${{ secrets.DOCKER_REGISTRY }}
     
     - name: Run pull_image.sh
       env:
