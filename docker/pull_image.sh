@@ -8,7 +8,7 @@ echo "Docker Registry: $DOCKER_REGISTRY"
 echo "Target Directory: $TARGET_DIR"
 echo "SWR_USER_NAME: $SWR_USER_NAME"
 
-docker login -u $SWR_USER_NAME -p $SWR_USER_PASSWORD  $DOCKER_REGISTRY
+docker login -u $SWR_USER_NAME -p $SWR_USER_PASSWORD  swr.cn-north-4.myhuaweicloud.com
 
 # 检查指定的文件夹是否存在
 if [ ! -d "$TARGET_DIR" ]; then
