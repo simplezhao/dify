@@ -13,16 +13,11 @@ jobs:
     - name: checkout 
       uses: actions/checkout@v4
 
-    - name: Log in to Docker Hub
+    - name: Run pull_image.sh
       env:
         DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
         SWR_USER_NAME: ${{ secrets.SWR_USER_NAME }}
         SWR_USER_PASSWORD: ${{ secrets.SWR_USER_PASSWORD }}
-      run: |
-        echo "${SWR_USER_PASSWORD}" | docker login "${DOCKER_REGISTRY}" --username "${SWR_USER_NAME}" --password-stdin 
-    - name: Run pull_image.sh
-      env:
-        DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
       run: |
         chmod +x ./docker/pull_image.sh
         ./docker/pull_image.sh

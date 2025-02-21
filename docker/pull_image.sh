@@ -4,6 +4,8 @@
 DOCKER_REGISTRY=$DOCKER_REGISTRY
 TARGET_DIR="./"
 
+docker login -u $SWR_USER_NAME -p $SWR_USER_PASSWORD  $DOCKER_REGISTRY
+
 # 检查指定的文件夹是否存在
 if [ ! -d "$TARGET_DIR" ]; then
     echo "The specified directory does not exist: $TARGET_DIR"
