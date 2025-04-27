@@ -4,7 +4,7 @@
   <a href="https://cloud.dify.ai">Dify Bulut</a> ·
   <a href="https://docs.dify.ai/getting-started/install-self-hosted">Kendi Sunucunuzda Barındırma</a> ·
   <a href="https://docs.dify.ai">Dokümantasyon</a> ·
-  <a href="https://udify.app/chat/22L1zSxg6yW1cWQg">Yalnızca İngilizce: Kurumsal Sorgulama</a>
+  <a href="https://dify.ai/pricing">Dify ürün seçeneklerine genel bakış</a>
 </p>
 
 <p align="center">
@@ -198,6 +198,7 @@ Yüksek kullanılabilirliğe sahip bir kurulum yapılandırmak isterseniz, Dify'
 - [@LeoQuote tarafından Helm Chart](https://github.com/douban/charts/tree/master/charts/dify)
 - [@BorisPolonsky tarafından Helm Chart](https://github.com/BorisPolonsky/dify-helm)
 - [@Winson-030 tarafından YAML dosyası](https://github.com/Winson-030/dify-kubernetes)
+- [@wyy-holding tarafından YAML dosyası](https://github.com/wyy-holding/dify-k8s)
 
 #### Dağıtım için Terraform Kullanımı
 

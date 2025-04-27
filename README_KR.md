@@ -4,7 +4,7 @@
   <a href="https://cloud.dify.ai">Dify 클라우드</a> ·
   <a href="https://docs.dify.ai/getting-started/install-self-hosted">셀프-호스팅</a> ·
   <a href="https://docs.dify.ai">문서</a> ·
-  <a href="https://udify.app/chat/22L1zSxg6yW1cWQg">기업 문의 (영어만 가능)</a>
+  <a href="https://dify.ai/pricing">Dify 제품 에디션 안내</a>
 </p>
 
 <p align="center">
@@ -197,7 +197,9 @@ Dify를 Kubernetes에 배포하고 프리미엄 스케일링 설정을 구성했
 
 - [Helm Chart by @LeoQuote](https://github.com/douban/charts/tree/master/charts/dify)
 - [Helm Chart by @BorisPolonsky](https://github.com/BorisPolonsky/dify-helm)
+- [Helm Chart by @magicsong](https://github.com/magicsong/ai-charts)
 - [YAML file by @Winson-030](https://github.com/Winson-030/dify-kubernetes)
+- [YAML file by @wyy-holding](https://github.com/wyy-holding/dify-k8s)
 
 #### Terraform을 사용한 배포
 

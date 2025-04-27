@@ -4,7 +4,7 @@
   <a href="https://cloud.dify.ai">Dify Cloud</a> ·
   <a href="https://docs.dify.ai/getting-started/install-self-hosted">Auto-hébergement</a> ·
   <a href="https://docs.dify.ai">Documentation</a> ·
-  <a href="https://udify.app/chat/22L1zSxg6yW1cWQg">Demande d’entreprise (en anglais seulement)</a>
+  <a href="https://dify.ai/pricing">Présentation des différentes offres Dify</a>
 </p>
 
 <p align="center">
@@ -203,7 +203,9 @@ Si vous souhaitez configurer une configuration haute disponibilité, la communau
 
 - [Helm Chart par @LeoQuote](https://github.com/douban/charts/tree/master/charts/dify)
 - [Helm Chart par @BorisPolonsky](https://github.com/BorisPolonsky/dify-helm)
+- [Helm Chart par @magicsong](https://github.com/magicsong/ai-charts)
 - [Fichier YAML par @Winson-030](https://github.com/Winson-030/dify-kubernetes)
+- [Fichier YAML par @wyy-holding](https://github.com/wyy-holding/dify-k8s)
 
 #### Utilisation de Terraform pour le déploiement
 

@@ -21,13 +21,14 @@ import ImageGallery from '@/app/components/base/image-gallery'
 import { useChatContext } from '@/app/components/base/chat/chat/context'
 import VideoGallery from '@/app/components/base/video-gallery'
 import AudioGallery from '@/app/components/base/audio-gallery'
-import SVGRenderer from '@/app/components/base/svg-gallery'
 import MarkdownButton from '@/app/components/base/markdown-blocks/button'
 import MarkdownForm from '@/app/components/base/markdown-blocks/form'
+import MarkdownMusic from '@/app/components/base/markdown-blocks/music'
 import ThinkBlock from '@/app/components/base/markdown-blocks/think-block'
 import { Theme } from '@/types/app'
 import useTheme from '@/hooks/use-theme'
 import cn from '@/utils/classnames'
+import SVGRenderer from './svg-gallery'
 
 // Available language https://github.com/react-syntax-highlighter/react-syntax-highlighter/blob/master/AVAILABLE_LANGUAGES_HLJS.MD
 const capitalizationLanguageNameMap: Record<string, string> = {
@@ -51,6 +52,7 @@ const capitalizationLanguageNameMap: Record<string, string> = {
   json: 'JSON',
   latex: 'Latex',
   svg: 'SVG',
+  abc: 'ABC',
 }
 const getCorrectCapitalizationLanguageName = (language: string) => {
   if (!language)
@@ -66,18 +68,30 @@ const preprocessLaTeX = (content: string) => {
   if (typeof content !== 'string')
     return content
 
-  return flow([
+  const codeBlockRegex = /```[\s\S]*?```/g
+  const codeBlocks = content.match(codeBlockRegex) || []
+  let processedContent = content.replace(codeBlockRegex, 'CODE_BLOCK_PLACEHOLDER')
+
+  processedContent = flow([
     (str: string) => str.replace(/\\\[(.*?)\\\]/g, (_, equation) => `$$${equation}$$`),
     (str: string) => str.replace(/\\\[(.*?)\\\]/gs, (_, equation) => `$$${equation}$$`),
     (str: string) => str.replace(/\\\((.*?)\\\)/g, (_, equation) => `$$${equation}$$`),
     (str: string) => str.replace(/(^|[^\\])\$(.+?)\$/g, (_, prefix, equation) => `${prefix}$${equation}$`),
-  ])(content)
+  ])(processedContent)
+
+  codeBlocks.forEach((block) => {
+    processedContent = processedContent.replace('CODE_BLOCK_PLACEHOLDER', block)
+  })
+
+  return processedContent
 }
 
 const preprocessThinkTag = (content: string) => {
+  const thinkOpenTagRegex = /<think>\n/g
+  const thinkCloseTagRegex = /\n<\/think>/g
   return flow([
-    (str: string) => str.replace('<think>\n', '<details data-think=true>\n'),
-    (str: string) => str.replace('\n</think>', '\n[ENDTHINKFLAG]</details>'),
+    (str: string) => str.replace(thinkOpenTagRegex, '<details data-think=true>\n'),
+    (str: string) => str.replace(thinkCloseTagRegex, '\n[ENDTHINKFLAG]</details>'),
   ])(content)
 }
 
@@ -118,64 +132,73 @@ const CodeBlock: any = memo(({ inline, className, children, ...props }: any) => 
       try {
         return JSON.parse(String(children).replace(/\n$/, ''))
       }
-      catch (error) { }
+      catch { }
     }
     return JSON.parse('{"title":{"text":"ECharts error - Wrong JSON format."}}')
   }, [language, children])
 
   const renderCodeContent = useMemo(() => {
     const content = String(children).replace(/\n$/, '')
-    if (language === 'mermaid' && isSVG) {
-      return <Flowchart PrimitiveCode={content} />
-    }
-    else if (language === 'echarts') {
-      return (
-        <div style={{ minHeight: '350px', minWidth: '100%', overflowX: 'scroll' }}>
+    switch (language) {
+      case 'mermaid':
+        if (isSVG)
+          return <Flowchart PrimitiveCode={content} />
+        break
+      case 'echarts':
+        return (
+          <div style={{ minHeight: '350px', minWidth: '100%', overflowX: 'scroll' }}>
+            <ErrorBoundary>
+              <ReactEcharts option={chartData} style={{ minWidth: '700px' }} />
+            </ErrorBoundary>
+          </div>
+        )
+      case 'svg':
+        if (isSVG) {
+          return (
+            <ErrorBoundary>
+              <SVGRenderer content={content} />
+            </ErrorBoundary>
+          )
+        }
+        break
+      case 'abc':
+        return (
           <ErrorBoundary>
-            <ReactEcharts option={chartData} style={{ minWidth: '700px' }} />
+            <MarkdownMusic children={content} />
           </ErrorBoundary>
-        </div>
-      )
+        )
+      default:
+        return (
+          <SyntaxHighlighter
+            {...props}
+            style={theme === Theme.light ? atelierHeathLight : atelierHeathDark}
+            customStyle={{
+              paddingLeft: 12,
+              borderBottomLeftRadius: '10px',
+              borderBottomRightRadius: '10px',
+              backgroundColor: 'var(--color-components-input-bg-normal)',
+            }}
+            language={match?.[1]}
+            showLineNumbers
+            PreTag="div"
+          >
+            {content}
+          </SyntaxHighlighter>
+        )
     }
-    else if (language === 'svg' && isSVG) {
-      return (
-        <ErrorBoundary>
-          <SVGRenderer content={content} />
-        </ErrorBoundary>
-      )
-    }
-    else {
-      return (
-        <SyntaxHighlighter
-          {...props}
-          style={theme === Theme.light ? atelierHeathLight : atelierHeathDark}
-          customStyle={{
-            paddingLeft: 12,
-            borderBottomLeftRadius: '10px',
-            borderBottomRightRadius: '10px',
-            backgroundColor: 'var(--color-components-input-bg-normal)',
-          }}
-          language={match?.[1]}
-          showLineNumbers
-          PreTag="div"
-        >
-          {content}
-        </SyntaxHighlighter>
-      )
-    }
-  }, [language, match, props, children, chartData, isSVG])
+  }, [children, language, isSVG, chartData, props, theme, match])
 
   if (inline || !match)
     return <code {...props} className={className}>{children}</code>
 
   return (
     <div className='relative'>
-      <div className='bg-components-input-bg-normal rounded-t-[10px] flex justify-between h-8 items-center p-1 pl-3 border-b border-divider-subtle'>
+      <div className='flex h-8 items-center justify-between rounded-t-[10px] border-b border-divider-subtle bg-components-input-bg-normal p-1 pl-3'>
         <div className='system-xs-semibold-uppercase text-text-secondary'>{languageShowName}</div>
         <div className='flex items-center gap-1'>
           {(['mermaid', 'svg']).includes(language!) && <SVGBtn isSVG={isSVG} setIsSVG={setIsSVG} />}
           <ActionButton>
-            <CopyIcon content={String(children).replace(/\n$/, '')}/>
+            <CopyIcon content={String(children).replace(/\n$/, '')} />
           </ActionButton>
         </div>
       </div>
@@ -212,31 +235,33 @@ const Paragraph = (paragraph: any) => {
   const children_node = node.children
   if (children_node && children_node[0] && 'tagName' in children_node[0] && children_node[0].tagName === 'img') {
     return (
-      <>
+      <div className="markdown-img-wrapper">
         <ImageGallery srcs={[children_node[0].properties.src]} />
         {
-          Array.isArray(paragraph.children) ? <p>{paragraph.children.slice(1)}</p> : null
+          Array.isArray(paragraph.children) && paragraph.children.length > 1 && (
+            <div className="mt-2">{paragraph.children.slice(1)}</div>
+          )
         }
-      </>
+      </div>
     )
   }
   return <p>{paragraph.children}</p>
 }
 
 const Img = ({ src }: any) => {
-  return (<ImageGallery srcs={[src]} />)
+  return <div className="markdown-img-wrapper"><ImageGallery srcs={[src]} /></div>
 }
 
-const Link = ({ node, ...props }: any) => {
+const Link = ({ node, children, ...props }: any) => {
   if (node.properties?.href && node.properties.href?.toString().startsWith('abbr')) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const { onSend } = useChatContext()
     const hidden_text = decodeURIComponent(node.properties.href.toString().split('abbr:')[1])
 
-    return <abbr className="underline decoration-dashed !decoration-primary-700 cursor-pointer" onClick={() => onSend?.(hidden_text)} title={node.children[0]?.value}>{node.children[0]?.value}</abbr>
+    return <abbr className="cursor-pointer underline !decoration-primary-700 decoration-dashed" onClick={() => onSend?.(hidden_text)} title={node.children[0]?.value}>{node.children[0]?.value}</abbr>
   }
   else {
-    return <a {...props} target="_blank" className="underline decoration-dashed !decoration-primary-700 cursor-pointer">{node.children[0] ? node.children[0]?.value : 'Download'}</a>
+    return <a {...props} target="_blank" className="cursor-pointer underline !decoration-primary-700 decoration-dashed">{children || 'Download'}</a>
   }
 }
 
@@ -245,6 +270,7 @@ export function Markdown(props: { content: string; className?: string; customDis
     preprocessThinkTag,
     preprocessLaTeX,
   ])(props.content)
+
   return (
     <div className={cn('markdown-body', '!text-text-primary', props.className)}>
       <ReactMarkdown

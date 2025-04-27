@@ -12,19 +12,22 @@ from configs import dify_config
 from constants.languages import languages
 from core.rag.datasource.vdb.vector_factory import Vector
 from core.rag.datasource.vdb.vector_type import VectorType
+from core.rag.index_processor.constant.built_in_field import BuiltInField
 from core.rag.models.document import Document
 from events.app_event import app_was_created
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
+from extensions.ext_storage import storage
 from libs.helper import email as email_validate
 from libs.password import hash_password, password_pattern, valid_password
 from libs.rsa import generate_key_pair
 from models import Tenant
-from models.dataset import Dataset, DatasetCollectionBinding, DocumentSegment
+from models.dataset import Dataset, DatasetCollectionBinding, DatasetMetadata, DatasetMetadataBinding, DocumentSegment
 from models.dataset import Document as DatasetDocument
 from models.model import Account, App, AppAnnotationSetting, AppMode, Conversation, MessageAnnotation
 from models.provider import Provider, ProviderModel
 from services.account_service import RegisterService, TenantService
+from services.clear_free_plan_tenant_expired_logs import ClearFreePlanTenantExpiredLogs
 from services.plugin.data_migration import PluginDataMigration
 from services.plugin.plugin_migration import PluginMigration
 
@@ -160,11 +163,17 @@ def migrate_annotation_vector_database():
     while True:
         try:
             # get apps info
+            per_page = 50
             apps = (
-                App.query.filter(App.status == "normal")
+                db.session.query(App)
+                .filter(App.status == "normal")
                 .order_by(App.created_at.desc())
-                .paginate(page=page, per_page=50)
+                .limit(per_page)
+                .offset((page - 1) * per_page)
+                .all()
             )
+            if not apps:
+                break
         except NotFound:
             break
 
@@ -263,10 +272,13 @@ def migrate_knowledge_vector_database():
     upper_collection_vector_types = {
         VectorType.MILVUS,
         VectorType.PGVECTOR,
+        VectorType.VASTBASE,
         VectorType.RELYT,
         VectorType.WEAVIATE,
         VectorType.ORACLE,
         VectorType.ELASTICSEARCH,
+        VectorType.OPENGAUSS,
+        VectorType.TABLESTORE,
     }
     lower_collection_vector_types = {
         VectorType.ANALYTICDB,
@@ -476,14 +488,11 @@ def convert_to_agent_apps():
     click.echo(click.style("Conversion complete. Converted {} agent apps.".format(len(proceeded_app_ids)), fg="green"))
 
 
-@click.command("add-qdrant-doc-id-index", help="Add Qdrant doc_id index.")
+@click.command("add-qdrant-index", help="Add Qdrant index.")
 @click.option("--field", default="metadata.doc_id", prompt=False, help="Index field , default is metadata.doc_id.")
-def add_qdrant_doc_id_index(field: str):
-    click.echo(click.style("Starting Qdrant doc_id index creation.", fg="green"))
-    vector_type = dify_config.VECTOR_STORE
-    if vector_type != "qdrant":
-        click.echo(click.style("This command only supports Qdrant vector store.", fg="red"))
-        return
+def add_qdrant_index(field: str):
+    click.echo(click.style("Starting Qdrant index creation.", fg="green"))
+
     create_count = 0
 
     try:
@@ -530,6 +539,76 @@ def add_qdrant_doc_id_index(field: str):
         click.echo(click.style("Failed to create Qdrant client.", fg="red"))
 
     click.echo(click.style(f"Index creation complete. Created {create_count} collection indexes.", fg="green"))
+
+
+@click.command("old-metadata-migration", help="Old metadata migration.")
+def old_metadata_migration():
+    """
+    Old metadata migration.
+    """
+    click.echo(click.style("Starting old metadata migration.", fg="green"))
+
+    page = 1
+    while True:
+        try:
+            documents = (
+                DatasetDocument.query.filter(DatasetDocument.doc_metadata is not None)
+                .order_by(DatasetDocument.created_at.desc())
+                .paginate(page=page, per_page=50)
+            )
+        except NotFound:
+            break
+        if not documents:
+            break
+        for document in documents:
+            if document.doc_metadata:
+                doc_metadata = document.doc_metadata
+                for key, value in doc_metadata.items():
+                    for field in BuiltInField:
+                        if field.value == key:
+                            break
+                    else:
+                        dataset_metadata = (
+                            db.session.query(DatasetMetadata)
+                            .filter(DatasetMetadata.dataset_id == document.dataset_id, DatasetMetadata.name == key)
+                            .first()
+                        )
+                        if not dataset_metadata:
+                            dataset_metadata = DatasetMetadata(
+                                tenant_id=document.tenant_id,
+                                dataset_id=document.dataset_id,
+                                name=key,
+                                type="string",
+                                created_by=document.created_by,
+                            )
+                            db.session.add(dataset_metadata)
+                            db.session.flush()
+                            dataset_metadata_binding = DatasetMetadataBinding(
+                                tenant_id=document.tenant_id,
+                                dataset_id=document.dataset_id,
+                                metadata_id=dataset_metadata.id,
+                                document_id=document.id,
+                                created_by=document.created_by,
+                            )
+                            db.session.add(dataset_metadata_binding)
+                        else:
+                            dataset_metadata_binding = DatasetMetadataBinding.query.filter(
+                                DatasetMetadataBinding.dataset_id == document.dataset_id,
+                                DatasetMetadataBinding.document_id == document.id,
+                                DatasetMetadataBinding.metadata_id == dataset_metadata.id,
+                            ).first()
+                            if not dataset_metadata_binding:
+                                dataset_metadata_binding = DatasetMetadataBinding(
+                                    tenant_id=document.tenant_id,
+                                    dataset_id=document.dataset_id,
+                                    metadata_id=dataset_metadata.id,
+                                    document_id=document.id,
+                                    created_by=document.created_by,
+                                )
+                                db.session.add(dataset_metadata_binding)
+                        db.session.commit()
+        page += 1
+    click.echo(click.style("Old metadata migration completed.", fg="green"))
 
 
 @click.command("create-tenant", help="Create account and tenant.")
@@ -717,3 +796,294 @@ def install_plugins(input_file: str, output_file: str, workers: int):
     PluginMigration.install_plugins(input_file, output_file, workers)
 
     click.echo(click.style("Install plugins completed.", fg="green"))
+
+
+@click.command("clear-free-plan-tenant-expired-logs", help="Clear free plan tenant expired logs.")
+@click.option("--days", prompt=True, help="The days to clear free plan tenant expired logs.", default=30)
+@click.option("--batch", prompt=True, help="The batch size to clear free plan tenant expired logs.", default=100)
+@click.option(
+    "--tenant_ids",
+    prompt=True,
+    multiple=True,
+    help="The tenant ids to clear free plan tenant expired logs.",
+)
+def clear_free_plan_tenant_expired_logs(days: int, batch: int, tenant_ids: list[str]):
+    """
+    Clear free plan tenant expired logs.
+    """
+    click.echo(click.style("Starting clear free plan tenant expired logs.", fg="white"))
+
+    ClearFreePlanTenantExpiredLogs.process(days, batch, tenant_ids)
+
+    click.echo(click.style("Clear free plan tenant expired logs completed.", fg="green"))
+
+
+@click.command("clear-orphaned-file-records", help="Clear orphaned file records.")
+def clear_orphaned_file_records():
+    """
+    Clear orphaned file records in the database.
+    """
+
+    # define tables and columns to process
+    files_tables = [
+        {"table": "upload_files", "id_column": "id", "key_column": "key"},
+        {"table": "tool_files", "id_column": "id", "key_column": "file_key"},
+    ]
+    ids_tables = [
+        {"type": "uuid", "table": "message_files", "column": "upload_file_id"},
+        {"type": "text", "table": "documents", "column": "data_source_info"},
+        {"type": "text", "table": "document_segments", "column": "content"},
+        {"type": "text", "table": "messages", "column": "answer"},
+        {"type": "text", "table": "workflow_node_executions", "column": "inputs"},
+        {"type": "text", "table": "workflow_node_executions", "column": "process_data"},
+        {"type": "text", "table": "workflow_node_executions", "column": "outputs"},
+        {"type": "text", "table": "conversations", "column": "introduction"},
+        {"type": "text", "table": "conversations", "column": "system_instruction"},
+        {"type": "json", "table": "messages", "column": "inputs"},
+        {"type": "json", "table": "messages", "column": "message"},
+    ]
+
+    # notify user and ask for confirmation
+    click.echo(
+        click.style("This command will find and delete orphaned file records in the following tables:", fg="yellow")
+    )
+    for files_table in files_tables:
+        click.echo(click.style(f"- {files_table['table']}", fg="yellow"))
+    click.echo(
+        click.style("The following tables and columns will be scanned to find orphaned file records:", fg="yellow")
+    )
+    for ids_table in ids_tables:
+        click.echo(click.style(f"- {ids_table['table']} ({ids_table['column']})", fg="yellow"))
+    click.echo("")
+
+    click.echo(click.style("!!! USE WITH CAUTION !!!", fg="red"))
+    click.echo(
+        click.style(
+            (
+                "Since not all patterns have been fully tested, "
+                "please note that this command may delete unintended file records."
+            ),
+            fg="yellow",
+        )
+    )
+    click.echo(
+        click.style("This cannot be undone. Please make sure to back up your database before proceeding.", fg="yellow")
+    )
+    click.echo(
+        click.style(
+            (
+                "It is also recommended to run this during the maintenance window, "
+                "as this may cause high load on your instance."
+            ),
+            fg="yellow",
+        )
+    )
+    click.confirm("Do you want to proceed?", abort=True)
+
+    # start the cleanup process
+    click.echo(click.style("Starting orphaned file records cleanup.", fg="white"))
+
+    try:
+        # fetch file id and keys from each table
+        all_files_in_tables = []
+        for files_table in files_tables:
+            click.echo(click.style(f"- Listing file records in table {files_table['table']}", fg="white"))
+            query = f"SELECT {files_table['id_column']}, {files_table['key_column']} FROM {files_table['table']}"
+            with db.engine.begin() as conn:
+                rs = conn.execute(db.text(query))
+            for i in rs:
+                all_files_in_tables.append({"table": files_table["table"], "id": str(i[0]), "key": i[1]})
+        click.echo(click.style(f"Found {len(all_files_in_tables)} files in tables.", fg="white"))
+
+        # fetch referred table and columns
+        guid_regexp = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+        all_ids_in_tables = []
+        for ids_table in ids_tables:
+            query = ""
+            if ids_table["type"] == "uuid":
+                click.echo(
+                    click.style(
+                        f"- Listing file ids in column {ids_table['column']} in table {ids_table['table']}", fg="white"
+                    )
+                )
+                query = (
+                    f"SELECT {ids_table['column']} FROM {ids_table['table']} WHERE {ids_table['column']} IS NOT NULL"
+                )
+                with db.engine.begin() as conn:
+                    rs = conn.execute(db.text(query))
+                for i in rs:
+                    all_ids_in_tables.append({"table": ids_table["table"], "id": str(i[0])})
+            elif ids_table["type"] == "text":
+                click.echo(
+                    click.style(
+                        f"- Listing file-id-like strings in column {ids_table['column']} in table {ids_table['table']}",
+                        fg="white",
+                    )
+                )
+                query = (
+                    f"SELECT regexp_matches({ids_table['column']}, '{guid_regexp}', 'g') AS extracted_id "
+                    f"FROM {ids_table['table']}"
+                )
+                with db.engine.begin() as conn:
+                    rs = conn.execute(db.text(query))
+                for i in rs:
+                    for j in i[0]:
+                        all_ids_in_tables.append({"table": ids_table["table"], "id": j})
+            elif ids_table["type"] == "json":
+                click.echo(
+                    click.style(
+                        (
+                            f"- Listing file-id-like JSON string in column {ids_table['column']} "
+                            f"in table {ids_table['table']}"
+                        ),
+                        fg="white",
+                    )
+                )
+                query = (
+                    f"SELECT regexp_matches({ids_table['column']}::text, '{guid_regexp}', 'g') AS extracted_id "
+                    f"FROM {ids_table['table']}"
+                )
+                with db.engine.begin() as conn:
+                    rs = conn.execute(db.text(query))
+                for i in rs:
+                    for j in i[0]:
+                        all_ids_in_tables.append({"table": ids_table["table"], "id": j})
+        click.echo(click.style(f"Found {len(all_ids_in_tables)} file ids in tables.", fg="white"))
+
+    except Exception as e:
+        click.echo(click.style(f"Error fetching keys: {str(e)}", fg="red"))
+        return
+
+    # find orphaned files
+    all_files = [file["id"] for file in all_files_in_tables]
+    all_ids = [file["id"] for file in all_ids_in_tables]
+    orphaned_files = list(set(all_files) - set(all_ids))
+    if not orphaned_files:
+        click.echo(click.style("No orphaned file records found. There is nothing to delete.", fg="green"))
+        return
+    click.echo(click.style(f"Found {len(orphaned_files)} orphaned file records.", fg="white"))
+    for file in orphaned_files:
+        click.echo(click.style(f"- orphaned file id: {file}", fg="black"))
+    click.confirm(f"Do you want to proceed to delete all {len(orphaned_files)} orphaned file records?", abort=True)
+
+    # delete orphaned records for each file
+    try:
+        for files_table in files_tables:
+            click.echo(click.style(f"- Deleting orphaned file records in table {files_table['table']}", fg="white"))
+            query = f"DELETE FROM {files_table['table']} WHERE {files_table['id_column']} IN :ids"
+            with db.engine.begin() as conn:
+                conn.execute(db.text(query), {"ids": tuple(orphaned_files)})
+    except Exception as e:
+        click.echo(click.style(f"Error deleting orphaned file records: {str(e)}", fg="red"))
+        return
+    click.echo(click.style(f"Removed {len(orphaned_files)} orphaned file records.", fg="green"))
+
+
+@click.command("remove-orphaned-files-on-storage", help="Remove orphaned files on the storage.")
+def remove_orphaned_files_on_storage():
+    """
+    Remove orphaned files on the storage.
+    """
+
+    # define tables and columns to process
+    files_tables = [
+        {"table": "upload_files", "key_column": "key"},
+        {"table": "tool_files", "key_column": "file_key"},
+    ]
+    storage_paths = ["image_files", "tools", "upload_files"]
+
+    # notify user and ask for confirmation
+    click.echo(click.style("This command will find and remove orphaned files on the storage,", fg="yellow"))
+    click.echo(
+        click.style("by comparing the files on the storage with the records in the following tables:", fg="yellow")
+    )
+    for files_table in files_tables:
+        click.echo(click.style(f"- {files_table['table']}", fg="yellow"))
+    click.echo(click.style("The following paths on the storage will be scanned to find orphaned files:", fg="yellow"))
+    for storage_path in storage_paths:
+        click.echo(click.style(f"- {storage_path}", fg="yellow"))
+    click.echo("")
+
+    click.echo(click.style("!!! USE WITH CAUTION !!!", fg="red"))
+    click.echo(
+        click.style(
+            "Currently, this command will work only for opendal based storage (STORAGE_TYPE=opendal).", fg="yellow"
+        )
+    )
+    click.echo(
+        click.style(
+            "Since not all patterns have been fully tested, please note that this command may delete unintended files.",
+            fg="yellow",
+        )
+    )
+    click.echo(
+        click.style("This cannot be undone. Please make sure to back up your storage before proceeding.", fg="yellow")
+    )
+    click.echo(
+        click.style(
+            (
+                "It is also recommended to run this during the maintenance window, "
+                "as this may cause high load on your instance."
+            ),
+            fg="yellow",
+        )
+    )
+    click.confirm("Do you want to proceed?", abort=True)
+
+    # start the cleanup process
+    click.echo(click.style("Starting orphaned files cleanup.", fg="white"))
+
+    # fetch file id and keys from each table
+    all_files_in_tables = []
+    try:
+        for files_table in files_tables:
+            click.echo(click.style(f"- Listing files from table {files_table['table']}", fg="white"))
+            query = f"SELECT {files_table['key_column']} FROM {files_table['table']}"
+            with db.engine.begin() as conn:
+                rs = conn.execute(db.text(query))
+            for i in rs:
+                all_files_in_tables.append(str(i[0]))
+        click.echo(click.style(f"Found {len(all_files_in_tables)} files in tables.", fg="white"))
+    except Exception as e:
+        click.echo(click.style(f"Error fetching keys: {str(e)}", fg="red"))
+
+    all_files_on_storage = []
+    for storage_path in storage_paths:
+        try:
+            click.echo(click.style(f"- Scanning files on storage path {storage_path}", fg="white"))
+            files = storage.scan(path=storage_path, files=True, directories=False)
+            all_files_on_storage.extend(files)
+        except FileNotFoundError as e:
+            click.echo(click.style(f"  -> Skipping path {storage_path} as it does not exist.", fg="yellow"))
+            continue
+        except Exception as e:
+            click.echo(click.style(f"  -> Error scanning files on storage path {storage_path}: {str(e)}", fg="red"))
+            continue
+    click.echo(click.style(f"Found {len(all_files_on_storage)} files on storage.", fg="white"))
+
+    # find orphaned files
+    orphaned_files = list(set(all_files_on_storage) - set(all_files_in_tables))
+    if not orphaned_files:
+        click.echo(click.style("No orphaned files found. There is nothing to remove.", fg="green"))
+        return
+    click.echo(click.style(f"Found {len(orphaned_files)} orphaned files.", fg="white"))
+    for file in orphaned_files:
+        click.echo(click.style(f"- orphaned file: {file}", fg="black"))
+    click.confirm(f"Do you want to proceed to remove all {len(orphaned_files)} orphaned files?", abort=True)
+
+    # delete orphaned files
+    removed_files = 0
+    error_files = 0
+    for file in orphaned_files:
+        try:
+            storage.delete(file)
+            removed_files += 1
+            click.echo(click.style(f"- Removing orphaned file: {file}", fg="white"))
+        except Exception as e:
+            error_files += 1
+            click.echo(click.style(f"- Error deleting orphaned file {file}: {str(e)}", fg="red"))
+            continue
+    if error_files == 0:
+        click.echo(click.style(f"Removed {removed_files} orphaned files without errors.", fg="green"))
+    else:
+        click.echo(click.style(f"Removed {removed_files} orphaned files, with {error_files} errors.", fg="yellow"))

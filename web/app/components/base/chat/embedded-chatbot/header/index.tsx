@@ -16,6 +16,7 @@ import cn from '@/utils/classnames'
 
 export type IHeaderProps = {
   isMobile?: boolean
+  allowResetChat?: boolean
   customerIcon?: React.ReactNode
   title: string
   theme?: Theme
@@ -23,6 +24,7 @@ export type IHeaderProps = {
 }
 const Header: FC<IHeaderProps> = ({
   isMobile,
+  allowResetChat,
   customerIcon,
   title,
   theme,
@@ -36,17 +38,17 @@ const Header: FC<IHeaderProps> = ({
   } = useEmbeddedChatbotContext()
   if (!isMobile) {
     return (
-      <div className='shrink-0 h-14 p-3 flex items-center justify-end'>
+      <div className='flex h-14 shrink-0 items-center justify-end p-3'>
         <div className='flex items-center gap-1'>
           {/* powered by */}
           <div className='shrink-0'>
             {!appData?.custom_config?.remove_webapp_brand && (
               <div className={cn(
-                'shrink-0 px-2 flex items-center gap-1.5',
+                'flex shrink-0 items-center gap-1.5 px-2',
               )}>
-                <div className='text-text-tertiary system-2xs-medium-uppercase'>{t('share.chat.poweredBy')}</div>
+                <div className='system-2xs-medium-uppercase text-text-tertiary'>{t('share.chat.poweredBy')}</div>
                 {appData?.custom_config?.replace_webapp_logo && (
-                  <img src={appData?.custom_config?.replace_webapp_logo} alt='logo' className='block w-auto h-5' />
+                  <img src={appData?.custom_config?.replace_webapp_logo} alt='logo' className='block h-5 w-auto' />
                 )}
                 {!appData?.custom_config?.replace_webapp_logo && (
                   <LogoSite className='!h-5' />
@@ -57,12 +59,12 @@ const Header: FC<IHeaderProps> = ({
           {currentConversationId && (
             <Divider type='vertical' className='h-3.5' />
           )}
-          {currentConversationId && (
+          {currentConversationId && allowResetChat && (
             <Tooltip
               popupContent={t('share.chat.resetChat')}
             >
               <ActionButton size='l' onClick={onCreateNewChat}>
-                <RiResetLeftLine className='w-[18px] h-[18px]' />
+                <RiResetLeftLine className='h-[18px] w-[18px]' />
               </ActionButton>
             </Tooltip>
           )}
@@ -76,10 +78,10 @@ const Header: FC<IHeaderProps> = ({
 
   return (
     <div
-      className={cn('shrink-0 flex items-center justify-between h-14 px-3 rounded-t-2xl')}
+      className={cn('flex h-14 shrink-0 items-center justify-between rounded-t-2xl px-3')}
       style={Object.assign({}, CssTransform(theme?.backgroundHeaderColorStyle ?? ''), CssTransform(theme?.headerBorderBottomStyle ?? '')) }
     >
-      <div className="grow flex items-center space-x-3">
+      <div className="flex grow items-center space-x-3">
         {customerIcon}
         <div
           className='system-md-semibold truncate'
@@ -89,12 +91,12 @@ const Header: FC<IHeaderProps> = ({
         </div>
       </div>
       <div className='flex items-center gap-1'>
-        {currentConversationId && (
+        {currentConversationId && allowResetChat && (
           <Tooltip
             popupContent={t('share.chat.resetChat')}
           >
             <ActionButton size='l' onClick={onCreateNewChat}>
-              <RiResetLeftLine className={cn('w-[18px] h-[18px]', theme?.colorPathOnHeader)} />
+              <RiResetLeftLine className={cn('h-[18px] w-[18px]', theme?.colorPathOnHeader)} />
             </ActionButton>
           </Tooltip>
         )}

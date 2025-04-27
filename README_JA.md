@@ -4,7 +4,7 @@
   <a href="https://cloud.dify.ai">Dify Cloud</a> ·
   <a href="https://docs.dify.ai/getting-started/install-self-hosted">セルフホスティング</a> ·
   <a href="https://docs.dify.ai">ドキュメント</a> ·
-  <a href="https://udify.app/chat/22L1zSxg6yW1cWQg">企業のお問い合わせ（英語のみ）</a>
+  <a href="https://dify.ai/pricing">Difyの各種エディションについて</a>
 </p>
 
 <p align="center">
@@ -204,7 +204,9 @@ docker compose up -d
 
 - [Helm Chart by @LeoQuote](https://github.com/douban/charts/tree/master/charts/dify)
 - [Helm Chart by @BorisPolonsky](https://github.com/BorisPolonsky/dify-helm)
+- [Helm Chart by @magicsong](https://github.com/magicsong/ai-charts)
 - [YAML file by @Winson-030](https://github.com/Winson-030/dify-kubernetes)
+- [YAML file by @wyy-holding](https://github.com/wyy-holding/dify-k8s)
 
 #### Terraformを使用したデプロイ
 

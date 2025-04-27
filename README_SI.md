@@ -8,7 +8,7 @@
   <a href="https://cloud.dify.ai">Dify Cloud</a> ·
   <a href="https://docs.dify.ai/getting-started/install-self-hosted">Samostojno gostovanje</a> ·
   <a href="https://docs.dify.ai">Dokumentacija</a> ·
-  <a href="https://udify.app/chat/22L1zSxg6yW1cWQg">Povpraševanje za podjetja</a>
+  <a href="https://dify.ai/pricing">Pregled ponudb izdelkov Dify</a>
 </p>
 
 <p align="center">
@@ -205,6 +205,7 @@ Star Dify on GitHub and be instantly notified of new releases.
 - [Helm Chart by @LeoQuote](https://github.com/douban/charts/tree/master/charts/dify)
 - [Helm Chart by @BorisPolonsky](https://github.com/BorisPolonsky/dify-helm)
 - [YAML file by @Winson-030](https://github.com/Winson-030/dify-kubernetes)
+- [YAML file by @wyy-holding](https://github.com/wyy-holding/dify-k8s)
 
 #### Uporaba Terraform za uvajanje
 

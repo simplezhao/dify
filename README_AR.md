@@ -4,7 +4,7 @@
   <a href="https://cloud.dify.ai">Dify Cloud</a> ·
   <a href="https://docs.dify.ai/getting-started/install-self-hosted">الاستضافة الذاتية</a> ·
   <a href="https://docs.dify.ai">التوثيق</a> ·
-  <a href="https://udify.app/chat/22L1zSxg6yW1cWQg">استفسار الشركات (للإنجليزية فقط)</a>
+  <a href="https://dify.ai/pricing">نظرة عامة على منتجات Dify</a>
 </p>
 
 <p align="center">
@@ -187,7 +187,9 @@ docker compose up -d
 
 - [رسم بياني Helm من قبل @LeoQuote](https://github.com/douban/charts/tree/master/charts/dify)
 - [رسم بياني Helm من قبل @BorisPolonsky](https://github.com/BorisPolonsky/dify-helm)
+- [رسم بياني Helm من قبل @magicsong](https://github.com/magicsong/ai-charts)
 - [ملف YAML من قبل @Winson-030](https://github.com/Winson-030/dify-kubernetes)
+- [ملف YAML من قبل @wyy-holding](https://github.com/wyy-holding/dify-k8s)
 
 #### استخدام Terraform للتوزيع
 
