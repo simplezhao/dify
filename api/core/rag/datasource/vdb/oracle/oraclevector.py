@@ -109,8 +109,19 @@ class OracleVector(BaseVector):
             )
 
     def _get_connection(self) -> Connection:
-        connection = oracledb.connect(user=self.config.user, password=self.config.password, dsn=self.config.dsn)
-        return connection
+        if self.config.is_autonomous:
+            connection = oracledb.connect(
+                user=self.config.user,
+                password=self.config.password,
+                dsn=self.config.dsn,
+                config_dir=self.config.config_dir,
+                wallet_location=self.config.wallet_location,
+                wallet_password=self.config.wallet_password,
+            )
+            return connection
+        else:
+            connection = oracledb.connect(user=self.config.user, password=self.config.password, dsn=self.config.dsn)
+            return connection
 
     def _create_connection_pool(self, config: OracleVectorConfig):
         pool_params = {
@@ -261,7 +272,7 @@ class OracleVector(BaseVector):
                 words = pseg.cut(query)
                 current_entity = ""
                 for word, pos in words:
-                    if pos in {"nr", "Ng", "eng", "nz", "n", "ORG", "v"}:  # nr: 人名, ns: 地名, nt: 机构名
+                    if pos in {"nr", "Ng", "eng", "nz", "n", "ORG", "v"}:  # nr: 人名，ns: 地名，nt: 机构名
                         current_entity += word
                     else:
                         if current_entity:
@@ -303,7 +314,6 @@ class OracleVector(BaseVector):
             return docs
         else:
             return [Document(page_content="", metadata={})]
-        return []
 
     def delete(self) -> None:
         with self._get_connection() as conn:
