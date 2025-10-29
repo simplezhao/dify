@@ -5,7 +5,6 @@ These tests verify the Celery-based asynchronous storage functionality
 for workflow node execution data.
 """
 
-from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -16,8 +15,9 @@ from core.workflow.entities.workflow_node_execution import (
     WorkflowNodeExecution,
     WorkflowNodeExecutionStatus,
 )
-from core.workflow.nodes.enums import NodeType
+from core.workflow.enums import NodeType
 from core.workflow.repositories.workflow_node_execution_repository import OrderConfig
+from libs.datetime_utils import naive_utc_now
 from models import Account, EndUser
 from models.workflow import WorkflowNodeExecutionTriggeredFrom
 
@@ -65,7 +65,7 @@ def sample_workflow_node_execution():
         title="Test Node",
         inputs={"input1": "value1"},
         status=WorkflowNodeExecutionStatus.RUNNING,
-        created_at=datetime.now(UTC).replace(tzinfo=None),
+        created_at=naive_utc_now(),
     )
 
 
@@ -149,7 +149,7 @@ class TestCeleryWorkflowNodeExecutionRepository:
         assert call_args["execution_data"] == sample_workflow_node_execution.model_dump()
         assert call_args["tenant_id"] == mock_account.current_tenant_id
         assert call_args["app_id"] == "test-app"
-        assert call_args["triggered_from"] == WorkflowNodeExecutionTriggeredFrom.WORKFLOW_RUN.value
+        assert call_args["triggered_from"] == WorkflowNodeExecutionTriggeredFrom.WORKFLOW_RUN
         assert call_args["creator_user_id"] == mock_account.id
 
         # Verify execution is cached
@@ -263,7 +263,7 @@ class TestCeleryWorkflowNodeExecutionRepository:
             title="Node 1",
             inputs={"input1": "value1"},
             status=WorkflowNodeExecutionStatus.RUNNING,
-            created_at=datetime.now(UTC).replace(tzinfo=None),
+            created_at=naive_utc_now(),
         )
         exec2 = WorkflowNodeExecution(
             id=str(uuid4()),
@@ -276,7 +276,7 @@ class TestCeleryWorkflowNodeExecutionRepository:
             title="Node 2",
             inputs={"input2": "value2"},
             status=WorkflowNodeExecutionStatus.RUNNING,
-            created_at=datetime.now(UTC).replace(tzinfo=None),
+            created_at=naive_utc_now(),
         )
 
         # Save both executions
@@ -314,7 +314,7 @@ class TestCeleryWorkflowNodeExecutionRepository:
             title="Node 2",
             inputs={},
             status=WorkflowNodeExecutionStatus.RUNNING,
-            created_at=datetime.now(UTC).replace(tzinfo=None),
+            created_at=naive_utc_now(),
         )
         exec2 = WorkflowNodeExecution(
             id=str(uuid4()),
@@ -327,7 +327,7 @@ class TestCeleryWorkflowNodeExecutionRepository:
             title="Node 1",
             inputs={},
             status=WorkflowNodeExecutionStatus.RUNNING,
-            created_at=datetime.now(UTC).replace(tzinfo=None),
+            created_at=naive_utc_now(),
         )
 
         # Save in random order

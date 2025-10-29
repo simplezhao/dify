@@ -1,7 +1,7 @@
 'use client'
 import type { FC } from 'react'
 import React, { useCallback } from 'react'
-import produce from 'immer'
+import { produce } from 'immer'
 import { useTranslation } from 'react-i18next'
 import { useEdgesInteractions } from '../../../hooks'
 import AddButton from '../../_base/components/add-button'
@@ -84,10 +84,10 @@ const ClassList: FC<Props> = ({
             })()
             return (
               <div key={item.id}
-                  className={cn(
-                    'group relative rounded-[10px] bg-components-panel-bg',
-                    `-ml-${handleSideWidth} min-h-[40px] px-0 py-0`,
-              )}>
+                className={cn(
+                  'group relative rounded-[10px] bg-components-panel-bg',
+                  `-ml-${handleSideWidth} min-h-[40px] px-0 py-0`,
+                )}>
                 <div >
                   <Item
                     className={cn(canDrag && 'handle')}

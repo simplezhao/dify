@@ -80,6 +80,7 @@ const translation = {
     workflowShortDescription: 'Agentowy przepływ dla inteligentnych automatyzacji',
     advancedUserDescription: 'Przepływ z dodatkowymi funkcjami pamięci i interfejsem chatbota.',
     dropDSLToCreateApp: 'Upuść plik DSL tutaj, aby utworzyć aplikację',
+    import: 'Import',
   },
   editApp: 'Edytuj informacje',
   editAppTitle: 'Edytuj informacje o aplikacji',
@@ -162,6 +163,10 @@ const translation = {
     aliyun: {
       title: 'Monitor Chmury',
       description: 'W pełni zarządzana i wolna od konserwacji platforma obserwowalności oferowana przez Alibaba Cloud umożliwia gotowe monitorowanie, śledzenie i oceny aplikacji Dify.',
+    },
+    tencent: {
+      title: 'Tencent APM',
+      description: 'Tencent Application Performance Monitoring zapewnia kompleksowe śledzenie i wielowymiarową analizę dla aplikacji LLM.',
     },
   },
   answerIcon: {
@@ -277,6 +282,11 @@ const translation = {
       languageChangeDesc: 'Zmień język interfejsu',
       themeSystemDesc: 'Podążaj za wyglądem swojego systemu operacyjnego',
       runDesc: 'Uruchom szybkie polecenia (motyw, język, ...)',
+      slashDesc: 'Wykonuj polecenia takie jak /theme, /lang',
+      communityDesc: 'Otwarta społeczność Discord',
+      docDesc: 'Otwórz dokumentację pomocy',
+      accountDesc: 'Przejdź do strony konta',
+      feedbackDesc: 'Otwarte dyskusje na temat opinii społeczności',
     },
     emptyState: {
       noAppsFound: 'Nie znaleziono aplikacji',
@@ -291,6 +301,7 @@ const translation = {
       workflowNodes: 'Węzły przepływu pracy',
       knowledgeBases: 'Bazy wiedzy',
       plugins: 'Wtyczki',
+      commands: 'Polecenia',
     },
     useAtForSpecific: 'Użyj @ dla określonych typów',
     searchPlaceholder: 'Wyszukaj lub wpisz @ dla poleceń...',
@@ -310,6 +321,11 @@ const translation = {
     inScope: 'w {{scope}}s',
     noMatchingCommands: 'Nie znaleziono pasujących poleceń',
     tryDifferentSearch: 'Spróbuj użyć innego hasła',
+    slashHint: 'Wpisz / aby zobaczyć wszystkie dostępne polecenia',
+    selectToNavigate: 'Wybierz, aby nawigować',
+    tips: 'Naciśnij ↑↓, aby nawigować',
+    startTyping: 'Zacznij pisać, aby wyszukać',
+    pressEscToClose: 'Naciśnij ESC, aby zamknąć',
   },
 }
 
