@@ -1,7 +1,8 @@
 'use client'
 import type { FC } from 'react'
-import React, { useRef } from 'react'
-import cn from '@/utils/classnames'
+import * as React from 'react'
+import { useRef } from 'react'
+import { cn } from '@/utils/classnames'
 
 type ParagraphInputProps = {
   value: string
@@ -42,7 +43,7 @@ const ParagraphInput: FC<ParagraphInputProps> = ({
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full resize-none border-0 bg-transparent pl-6 font-mono text-xs leading-[20px] text-text-secondary outline-none placeholder:text-text-quaternary"
+          className="w-full resize-none border-0 bg-transparent pl-6 font-mono text-xs leading-[20px] text-text-secondary outline-hidden placeholder:text-text-quaternary"
           style={{
             minHeight: `${Math.max(3, lineCount) * 20}px`,
             lineHeight: '20px',

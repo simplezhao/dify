@@ -1,29 +1,10 @@
 import type { Viewport } from 'reactflow'
-import type { VisionFile } from '@/types/app'
+import type { Metadata } from '@/app/components/base/chat/chat/type'
 import type {
   Edge,
   Node,
 } from '@/app/components/workflow/types'
-import type { Metadata } from '@/app/components/base/chat/chat/type'
-
-// Log type contains key:string conversation_id:string created_at:string question:string answer:string
-export type Conversation = {
-  id: string
-  key: string
-  conversationId: string
-  question: string
-  answer: string
-  userRate: number
-  adminRate: number
-}
-
-export type ConversationListResponse = {
-  logs: Conversation[]
-}
-
-export const CompletionParams = ['temperature', 'top_p', 'presence_penalty', 'max_token', 'stop', 'frequency_penalty'] as const
-
-export type CompletionParamType = typeof CompletionParams[number]
+import type { VisionFile } from '@/types/app'
 
 export type CompletionParamsType = {
   max_tokens: number
@@ -77,7 +58,7 @@ export type MessageContent = {
   conversation_id: string
   query: string
   inputs: Record<string, any>
-  message: { role: string; text: string; files?: VisionFile[] }[]
+  message: { role: string, text: string, files?: VisionFile[] }[]
   message_tokens: number
   answer_tokens: number
   answer: string
@@ -108,7 +89,7 @@ export type MessageContent = {
 
 export type CompletionConversationGeneralDetail = {
   id: string
-  status: 'normal' | 'finished'
+  status: 'normal' | 'finished' | 'paused'
   from_source: 'api' | 'console'
   from_end_user_id: string
   from_end_user_session_id: string
@@ -294,13 +275,6 @@ export type WorkflowLogsResponse = {
   total: number
   page: number
 }
-export type WorkflowLogsRequest = {
-  keyword: string
-  status: string
-  page: number
-  limit: number // The default value is 20 and the range is 1-100
-}
-
 export type WorkflowRunDetailResponse = {
   id: string
   version: string
@@ -381,4 +355,23 @@ export type AgentLogDetailResponse = {
   meta: AgentLogMeta
   iterations: AgentIteration[]
   files: AgentLogFile[]
+}
+
+export type PauseType = {
+  type: 'human_input'
+  form_id: string
+  backstage_input_url: string
+} | {
+  type: 'breakpoint'
+}
+
+export type PauseDetail = {
+  node_id: string
+  node_title: string
+  pause_type: PauseType
+}
+
+export type WorkflowPausedDetailsResponse = {
+  paused_at: string
+  paused_nodes: PauseDetail[]
 }
