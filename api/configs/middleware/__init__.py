@@ -1,11 +1,12 @@
 import os
-from typing import Any, Literal
+from typing import Any, Literal, TypedDict
 from urllib.parse import parse_qsl, quote_plus
 
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, PositiveFloat, PositiveInt, computed_field
 from pydantic_settings import BaseSettings
 
 from .cache.redis_config import RedisConfig
+from .cache.redis_pubsub_config import RedisPubSubConfig
 from .storage.aliyun_oss_storage_config import AliyunOSSStorageConfig
 from .storage.amazon_s3_storage_config import S3StorageConfig
 from .storage.azure_blob_storage_config import AzureBlobStorageConfig
@@ -25,6 +26,7 @@ from .vdb.chroma_config import ChromaConfig
 from .vdb.clickzetta_config import ClickzettaConfig
 from .vdb.couchbase_config import CouchbaseConfig
 from .vdb.elasticsearch_config import ElasticsearchConfig
+from .vdb.hologres_config import HologresConfig
 from .vdb.huawei_cloud_config import HuaweiCloudConfig
 from .vdb.iris_config import IrisVectorConfig
 from .vdb.lindorm_config import LindormConfig
@@ -105,9 +107,20 @@ class KeywordStoreConfig(BaseSettings):
     )
 
 
+class SQLAlchemyEngineOptionsDict(TypedDict):
+    pool_size: int
+    max_overflow: int
+    pool_recycle: int
+    pool_pre_ping: bool
+    connect_args: dict[str, str]
+    pool_use_lifo: bool
+    pool_reset_on_return: None
+    pool_timeout: int
+
+
 class DatabaseConfig(BaseSettings):
     # Database type selector
-    DB_TYPE: Literal["postgresql", "mysql", "oceanbase"] = Field(
+    DB_TYPE: Literal["postgresql", "mysql", "oceanbase", "seekdb"] = Field(
         description="Database type to use. OceanBase is MySQL-compatible.",
         default="postgresql",
     )
@@ -207,11 +220,11 @@ class DatabaseConfig(BaseSettings):
 
     @computed_field  # type: ignore[prop-decorator]
     @property
-    def SQLALCHEMY_ENGINE_OPTIONS(self) -> dict[str, Any]:
+    def SQLALCHEMY_ENGINE_OPTIONS(self) -> SQLAlchemyEngineOptionsDict:
         # Parse DB_EXTRAS for 'options'
         db_extras_dict = dict(parse_qsl(self.DB_EXTRAS))
         options = db_extras_dict.get("options", "")
-        connect_args = {}
+        connect_args: dict[str, str] = {}
         # Use the dynamic SQLALCHEMY_DATABASE_URI_SCHEME property
         if self.SQLALCHEMY_DATABASE_URI_SCHEME.startswith("postgresql"):
             timezone_opt = "-c timezone=UTC"
@@ -221,7 +234,7 @@ class DatabaseConfig(BaseSettings):
                 merged_options = timezone_opt
             connect_args = {"options": merged_options}
 
-        return {
+        result: SQLAlchemyEngineOptionsDict = {
             "pool_size": self.SQLALCHEMY_POOL_SIZE,
             "max_overflow": self.SQLALCHEMY_MAX_OVERFLOW,
             "pool_recycle": self.SQLALCHEMY_POOL_RECYCLE,
@@ -231,6 +244,7 @@ class DatabaseConfig(BaseSettings):
             "pool_reset_on_return": None,
             "pool_timeout": self.SQLALCHEMY_POOL_TIMEOUT,
         }
+        return result
 
 
 class CeleryConfig(DatabaseConfig):
@@ -258,9 +272,18 @@ class CeleryConfig(DatabaseConfig):
         description="Password of the Redis Sentinel master.",
         default=None,
     )
+
     CELERY_SENTINEL_SOCKET_TIMEOUT: PositiveFloat | None = Field(
         description="Timeout for Redis Sentinel socket operations in seconds.",
         default=0.1,
+    )
+
+    CELERY_TASK_ANNOTATIONS: dict[str, Any] | None = Field(
+        description=(
+            "Annotations for Celery tasks as a JSON mapping of task name -> options "
+            "(for example, rate limits or other task-specific settings)."
+        ),
+        default=None,
     )
 
     @computed_field
@@ -317,6 +340,7 @@ class MiddlewareConfig(
     CeleryConfig,  # Note: CeleryConfig already inherits from DatabaseConfig
     KeywordStoreConfig,
     RedisConfig,
+    RedisPubSubConfig,
     # configs of storage and storage providers
     StorageConfig,
     AliyunOSSStorageConfig,
@@ -336,6 +360,7 @@ class MiddlewareConfig(
     AnalyticdbConfig,
     ChromaConfig,
     ClickzettaConfig,
+    HologresConfig,
     HuaweiCloudConfig,
     IrisVectorConfig,
     MilvusConfig,

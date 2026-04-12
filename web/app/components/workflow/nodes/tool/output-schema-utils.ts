@@ -1,13 +1,38 @@
+import type { SchemaTypeDefinition } from '@/service/use-common'
 import { VarType } from '@/app/components/workflow/types'
 import { getMatchedSchemaType } from '../_base/components/variable/use-match-schema-type'
-import type { SchemaTypeDefinition } from '@/service/use-common'
+
+/**
+ * Workflow-as-tool and some internal APIs store Dify VarType strings (e.g. `array[string]`)
+ * in JSON Schema `type` instead of standard `{ type: 'array', items: { type: 'string' } }`.
+ * Map those compact strings to VarType so downstream (e.g. Code node var picker) does not
+ * fall back to `any` and get filtered out.
+ */
+const resolveDifyCompactTypeString = (typeStr: string): VarType | undefined => {
+  const trimmed = typeStr.trim()
+  const m = /^array\[(string|number|integer|boolean|object|file|any)\]$/i.exec(trimmed)
+  if (!m)
+    return undefined
+  const inner = m[1].toLowerCase()
+  const map: Record<string, VarType> = {
+    string: VarType.arrayString,
+    number: VarType.arrayNumber,
+    integer: VarType.arrayNumber,
+    boolean: VarType.arrayBoolean,
+    object: VarType.arrayObject,
+    file: VarType.arrayFile,
+    any: VarType.arrayAny,
+  }
+  return map[inner]
+}
 
 /**
  * Normalizes a JSON Schema type to a simple string type.
  * Handles complex schemas with oneOf, anyOf, allOf.
  */
 export const normalizeJsonSchemaType = (schema: any): string | undefined => {
-  if (!schema) return undefined
+  if (!schema)
+    return undefined
   const { type, properties, items, oneOf, anyOf, allOf } = schema
 
   if (Array.isArray(type))
@@ -51,8 +76,14 @@ export const pickItemSchema = (schema: any) => {
 export const resolveVarType = (
   schema: any,
   schemaTypeDefinitions?: SchemaTypeDefinition[],
-): { type: VarType; schemaType?: string } => {
+): { type: VarType, schemaType?: string } => {
   const schemaType = getMatchedSchemaType(schema, schemaTypeDefinitions)
+  if (schema && typeof schema.type === 'string') {
+    const compact = resolveDifyCompactTypeString(schema.type)
+    if (compact !== undefined)
+      return { type: compact, schemaType }
+  }
+
   const normalizedType = normalizeJsonSchemaType(schema)
 
   switch (normalizedType) {

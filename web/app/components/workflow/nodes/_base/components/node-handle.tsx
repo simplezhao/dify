@@ -1,22 +1,19 @@
 import type { MouseEvent } from 'react'
+import type { PluginDefaultValue } from '../../../block-selector/types'
+import type { Node } from '../../../types'
 import {
   memo,
   useCallback,
   useEffect,
   useState,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Handle,
   Position,
 } from 'reactflow'
-import { useTranslation } from 'react-i18next'
-import {
-  BlockEnum,
-  NodeRunningStatus,
-} from '../../../types'
-import type { Node } from '../../../types'
+import { cn } from '@/utils/classnames'
 import BlockSelector from '../../../block-selector'
-import type { PluginDefaultValue } from '../../../block-selector/types'
 import {
   useAvailableBlocks,
   useIsChatMode,
@@ -27,7 +24,10 @@ import {
   useStore,
   useWorkflowStore,
 } from '../../../store'
-import cn from '@/utils/classnames'
+import {
+  BlockEnum,
+  NodeRunningStatus,
+} from '../../../types'
 
 type NodeHandleProps = {
   handleId: string
@@ -75,10 +75,10 @@ export const NodeTargetHandle = memo(({
     <>
       <Handle
         id={handleId}
-        type='target'
+        type="target"
         position={Position.Left}
         className={cn(
-          'z-[1] !h-4 !w-4 !rounded-none !border-none !bg-transparent !outline-none',
+          'z-1 h-4! w-4! rounded-none! border-none! bg-transparent! outline-hidden!',
           'after:absolute after:left-1.5 after:top-1 after:h-2 after:w-0.5 after:bg-workflow-link-line-handle',
           'transition-all hover:scale-125',
           data._runningStatus === NodeRunningStatus.Succeeded && 'after:bg-workflow-link-line-success-handle',
@@ -101,13 +101,13 @@ export const NodeTargetHandle = memo(({
               onOpenChange={handleOpenChange}
               onSelect={handleSelect}
               asChild
-              placement='left'
+              placement="left"
               triggerClassName={open => `
                 hidden absolute left-0 top-0 pointer-events-none
                 ${nodeSelectorClassName}
-                group-hover:!flex
-                ${data.selected && '!flex'}
-                ${open && '!flex'}
+                group-hover:flex!
+                ${data.selected && 'flex!'}
+                ${open && 'flex!'}
               `}
               availableBlocksTypes={availablePrevBlocks}
             />
@@ -186,10 +186,10 @@ export const NodeSourceHandle = memo(({
   return (
     <Handle
       id={handleId}
-      type='source'
+      type="source"
       position={Position.Right}
       className={cn(
-        'group/handle z-[1] !h-4 !w-4 !rounded-none !border-none !bg-transparent !outline-none',
+        'group/handle z-1 h-4! w-4! rounded-none! border-none! bg-transparent! outline-hidden!',
         'after:absolute after:right-1.5 after:top-1 after:h-2 after:w-0.5 after:bg-workflow-link-line-handle',
         'transition-all hover:scale-125',
         data._runningStatus === NodeRunningStatus.Succeeded && 'after:bg-workflow-link-line-success-handle',
@@ -201,15 +201,15 @@ export const NodeSourceHandle = memo(({
       isConnectable={isConnectable}
       onClick={handleHandleClick}
     >
-      <div className='absolute -top-1 left-1/2 hidden -translate-x-1/2 -translate-y-full rounded-lg border-[0.5px] border-components-panel-border bg-components-tooltip-bg p-1.5 shadow-lg group-hover/handle:block'>
-        <div className='system-xs-regular text-text-tertiary'>
-          <div className=' whitespace-nowrap'>
-            <span className='system-xs-medium text-text-secondary'>{t('workflow.common.parallelTip.click.title')}</span>
-            {t('workflow.common.parallelTip.click.desc')}
+      <div className="absolute -top-1 left-1/2 hidden -translate-x-1/2 -translate-y-full rounded-lg border-[0.5px] border-components-panel-border bg-components-tooltip-bg p-1.5 shadow-lg group-hover/handle:block">
+        <div className="system-xs-regular text-text-tertiary">
+          <div className=" whitespace-nowrap">
+            <span className="system-xs-medium text-text-secondary">{t('common.parallelTip.click.title', { ns: 'workflow' })}</span>
+            {t('common.parallelTip.click.desc', { ns: 'workflow' })}
           </div>
           <div>
-            <span className='system-xs-medium text-text-secondary'>{t('workflow.common.parallelTip.drag.title')}</span>
-            {t('workflow.common.parallelTip.drag.desc')}
+            <span className="system-xs-medium text-text-secondary">{t('common.parallelTip.drag.title', { ns: 'workflow' })}</span>
+            {t('common.parallelTip.drag.desc', { ns: 'workflow' })}
           </div>
         </div>
       </div>
@@ -223,9 +223,9 @@ export const NodeSourceHandle = memo(({
             triggerClassName={open => `
               hidden absolute top-0 left-0 pointer-events-none
               ${nodeSelectorClassName}
-              group-hover:!flex
-              ${data.selected && '!flex'}
-              ${open && '!flex'}
+              group-hover:flex!
+              ${data.selected && 'flex!'}
+              ${open && 'flex!'}
             `}
             availableBlocksTypes={availableNextBlocks}
           />

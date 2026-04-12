@@ -4,15 +4,17 @@ import os
 import time
 from collections.abc import Callable
 from functools import wraps
-from typing import ParamSpec, TypeVar
 
 from flask import abort, request
+from sqlalchemy import select
 
 from configs import dify_config
+from controllers.console.auth.error import AuthenticationFailedError, EmailCodeError
 from controllers.console.workspace.error import AccountNotInitializedError
 from enums.cloud_plan import CloudPlan
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
+from libs.encryption import FieldEncryption
 from libs.login import current_account_with_tenant
 from models.account import AccountStatus
 from models.dataset import RateLimitLog
@@ -22,13 +24,18 @@ from services.operation_service import OperationService
 
 from .error import NotInitValidateError, NotSetupError, UnauthorizedAndForceLogout
 
-P = ParamSpec("P")
-R = TypeVar("R")
+# Field names for decryption
+FIELD_NAME_PASSWORD = "password"
+FIELD_NAME_CODE = "code"
+
+# Error messages for decryption failures
+ERROR_MSG_INVALID_ENCRYPTED_DATA = "Invalid encrypted data"
+ERROR_MSG_INVALID_ENCRYPTED_CODE = "Invalid encrypted code"
 
 
-def account_initialization_required(view: Callable[P, R]):
+def account_initialization_required[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
-    def decorated(*args: P.args, **kwargs: P.kwargs):
+    def decorated(*args: P.args, **kwargs: P.kwargs) -> R:
         # check account initialization
         current_user, _ = current_account_with_tenant()
         if current_user.status == AccountStatus.UNINITIALIZED:
@@ -39,7 +46,7 @@ def account_initialization_required(view: Callable[P, R]):
     return decorated
 
 
-def only_edition_cloud(view: Callable[P, R]):
+def only_edition_cloud[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
     def decorated(*args: P.args, **kwargs: P.kwargs):
         if dify_config.EDITION != "CLOUD":
@@ -50,7 +57,7 @@ def only_edition_cloud(view: Callable[P, R]):
     return decorated
 
 
-def only_edition_enterprise(view: Callable[P, R]):
+def only_edition_enterprise[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
     def decorated(*args: P.args, **kwargs: P.kwargs):
         if not dify_config.ENTERPRISE_ENABLED:
@@ -61,7 +68,7 @@ def only_edition_enterprise(view: Callable[P, R]):
     return decorated
 
 
-def only_edition_self_hosted(view: Callable[P, R]):
+def only_edition_self_hosted[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
     def decorated(*args: P.args, **kwargs: P.kwargs):
         if dify_config.EDITION != "SELF_HOSTED":
@@ -72,7 +79,7 @@ def only_edition_self_hosted(view: Callable[P, R]):
     return decorated
 
 
-def cloud_edition_billing_enabled(view: Callable[P, R]):
+def cloud_edition_billing_enabled[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
     def decorated(*args: P.args, **kwargs: P.kwargs):
         _, current_tenant_id = current_account_with_tenant()
@@ -84,7 +91,7 @@ def cloud_edition_billing_enabled(view: Callable[P, R]):
     return decorated
 
 
-def cloud_edition_billing_resource_check(resource: str):
+def cloud_edition_billing_resource_check[**P, R](resource: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
     def interceptor(view: Callable[P, R]):
         @wraps(view)
         def decorated(*args: P.args, **kwargs: P.kwargs):
@@ -126,7 +133,9 @@ def cloud_edition_billing_resource_check(resource: str):
     return interceptor
 
 
-def cloud_edition_billing_knowledge_limit_check(resource: str):
+def cloud_edition_billing_knowledge_limit_check[**P, R](
+    resource: str,
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     def interceptor(view: Callable[P, R]):
         @wraps(view)
         def decorated(*args: P.args, **kwargs: P.kwargs):
@@ -149,7 +158,7 @@ def cloud_edition_billing_knowledge_limit_check(resource: str):
     return interceptor
 
 
-def cloud_edition_billing_rate_limit_check(resource: str):
+def cloud_edition_billing_rate_limit_check[**P, R](resource: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
     def interceptor(view: Callable[P, R]):
         @wraps(view)
         def decorated(*args: P.args, **kwargs: P.kwargs):
@@ -185,7 +194,7 @@ def cloud_edition_billing_rate_limit_check(resource: str):
     return interceptor
 
 
-def cloud_utm_record(view: Callable[P, R]):
+def cloud_utm_record[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
     def decorated(*args: P.args, **kwargs: P.kwargs):
         with contextlib.suppress(Exception):
@@ -204,17 +213,13 @@ def cloud_utm_record(view: Callable[P, R]):
     return decorated
 
 
-def setup_required(view: Callable[P, R]):
+def setup_required[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
-    def decorated(*args: P.args, **kwargs: P.kwargs):
+    def decorated(*args: P.args, **kwargs: P.kwargs) -> R:
         # check setup
-        if (
-            dify_config.EDITION == "SELF_HOSTED"
-            and os.environ.get("INIT_PASSWORD")
-            and not db.session.query(DifySetup).first()
-        ):
-            raise NotInitValidateError()
-        elif dify_config.EDITION == "SELF_HOSTED" and not db.session.query(DifySetup).first():
+        if dify_config.EDITION == "SELF_HOSTED" and not db.session.scalar(select(DifySetup).limit(1)):
+            if os.environ.get("INIT_PASSWORD"):
+                raise NotInitValidateError()
             raise NotSetupError()
 
         return view(*args, **kwargs)
@@ -222,7 +227,7 @@ def setup_required(view: Callable[P, R]):
     return decorated
 
 
-def enterprise_license_required(view: Callable[P, R]):
+def enterprise_license_required[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
     def decorated(*args: P.args, **kwargs: P.kwargs):
         settings = FeatureService.get_system_features()
@@ -234,7 +239,7 @@ def enterprise_license_required(view: Callable[P, R]):
     return decorated
 
 
-def email_password_login_enabled(view: Callable[P, R]):
+def email_password_login_enabled[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
     def decorated(*args: P.args, **kwargs: P.kwargs):
         features = FeatureService.get_system_features()
@@ -247,7 +252,7 @@ def email_password_login_enabled(view: Callable[P, R]):
     return decorated
 
 
-def email_register_enabled(view: Callable[P, R]):
+def email_register_enabled[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
     def decorated(*args: P.args, **kwargs: P.kwargs):
         features = FeatureService.get_system_features()
@@ -260,7 +265,7 @@ def email_register_enabled(view: Callable[P, R]):
     return decorated
 
 
-def enable_change_email(view: Callable[P, R]):
+def enable_change_email[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
     def decorated(*args: P.args, **kwargs: P.kwargs):
         features = FeatureService.get_system_features()
@@ -273,21 +278,20 @@ def enable_change_email(view: Callable[P, R]):
     return decorated
 
 
-def is_allow_transfer_owner(view: Callable[P, R]):
+def is_allow_transfer_owner[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
     def decorated(*args: P.args, **kwargs: P.kwargs):
-        _, current_tenant_id = current_account_with_tenant()
-        features = FeatureService.get_features(current_tenant_id)
-        if features.is_allow_transfer_workspace:
-            return view(*args, **kwargs)
+        from libs.workspace_permission import check_workspace_owner_transfer_permission
 
-        # otherwise, return 403
-        abort(403)
+        _, current_tenant_id = current_account_with_tenant()
+        # Check both billing/plan level and workspace policy level permissions
+        check_workspace_owner_transfer_permission(current_tenant_id)
+        return view(*args, **kwargs)
 
     return decorated
 
 
-def knowledge_pipeline_publish_enabled(view: Callable[P, R]):
+def knowledge_pipeline_publish_enabled[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
     def decorated(*args: P.args, **kwargs: P.kwargs):
         _, current_tenant_id = current_account_with_tenant()
@@ -299,7 +303,7 @@ def knowledge_pipeline_publish_enabled(view: Callable[P, R]):
     return decorated
 
 
-def edit_permission_required(f: Callable[P, R]):
+def edit_permission_required[**P, R](f: Callable[P, R]) -> Callable[P, R]:
     @wraps(f)
     def decorated_function(*args: P.args, **kwargs: P.kwargs):
         from werkzeug.exceptions import Forbidden
@@ -317,7 +321,7 @@ def edit_permission_required(f: Callable[P, R]):
     return decorated_function
 
 
-def is_admin_or_owner_required(f: Callable[P, R]):
+def is_admin_or_owner_required[**P, R](f: Callable[P, R]) -> Callable[P, R]:
     @wraps(f)
     def decorated_function(*args: P.args, **kwargs: P.kwargs):
         from werkzeug.exceptions import Forbidden
@@ -333,7 +337,7 @@ def is_admin_or_owner_required(f: Callable[P, R]):
     return decorated_function
 
 
-def annotation_import_rate_limit(view: Callable[P, R]):
+def annotation_import_rate_limit[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     """
     Rate limiting decorator for annotation import operations.
 
@@ -382,7 +386,7 @@ def annotation_import_rate_limit(view: Callable[P, R]):
     return decorated
 
 
-def annotation_import_concurrency_limit(view: Callable[P, R]):
+def annotation_import_concurrency_limit[**P, R](view: Callable[P, R]) -> Callable[P, R]:
     """
     Concurrency control decorator for annotation import operations.
 
@@ -416,6 +420,78 @@ def annotation_import_concurrency_limit(view: Callable[P, R]):
 
         # Allow the request to proceed
         # The actual job registration will happen in the service layer
+        return view(*args, **kwargs)
+
+    return decorated
+
+
+def _decrypt_field(field_name: str, error_class: type[Exception], error_message: str) -> None:
+    """
+    Helper to decode a Base64 encoded field in the request payload.
+
+    Args:
+        field_name: Name of the field to decode
+        error_class: Exception class to raise on decoding failure
+        error_message: Error message to include in the exception
+    """
+    if not request or not request.is_json:
+        return
+    # Get the payload dict - it's cached and mutable
+    payload = request.get_json()
+    if not payload or field_name not in payload:
+        return
+    encoded_value = payload[field_name]
+    decoded_value = FieldEncryption.decrypt_field(encoded_value)
+
+    # If decoding failed, raise error immediately
+    if decoded_value is None:
+        raise error_class(error_message)
+
+    # Update payload dict in-place with decoded value
+    # Since payload is a mutable dict and get_json() returns the cached reference,
+    # modifying it will affect all subsequent accesses including console_ns.payload
+    payload[field_name] = decoded_value
+
+
+def decrypt_password_field[**P, R](view: Callable[P, R]) -> Callable[P, R]:
+    """
+    Decorator to decrypt password field in request payload.
+
+    Automatically decrypts the 'password' field if encryption is enabled.
+    If decryption fails, raises AuthenticationFailedError.
+
+    Usage:
+        @decrypt_password_field
+        def post(self):
+            args = LoginPayload.model_validate(console_ns.payload)
+            # args.password is now decrypted
+    """
+
+    @wraps(view)
+    def decorated(*args: P.args, **kwargs: P.kwargs):
+        _decrypt_field(FIELD_NAME_PASSWORD, AuthenticationFailedError, ERROR_MSG_INVALID_ENCRYPTED_DATA)
+        return view(*args, **kwargs)
+
+    return decorated
+
+
+def decrypt_code_field[**P, R](view: Callable[P, R]) -> Callable[P, R]:
+    """
+    Decorator to decrypt verification code field in request payload.
+
+    Automatically decrypts the 'code' field if encryption is enabled.
+    If decryption fails, raises EmailCodeError.
+
+    Usage:
+        @decrypt_code_field
+        def post(self):
+            args = EmailCodeLoginPayload.model_validate(console_ns.payload)
+            # args.code is now decrypted
+    """
+
+    @wraps(view)
+    def decorated(*args: P.args, **kwargs: P.kwargs):
+        _decrypt_field(FIELD_NAME_CODE, EmailCodeError, ERROR_MSG_INVALID_ENCRYPTED_CODE)
         return view(*args, **kwargs)
 
     return decorated

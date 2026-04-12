@@ -24,11 +24,11 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import delete, select
+from graphon.entities import WorkflowExecution
+from graphon.enums import WorkflowExecutionStatus
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload, sessionmaker
 
-from core.workflow.entities import WorkflowExecution
-from core.workflow.enums import WorkflowExecutionStatus
 from extensions.ext_storage import storage
 from libs.datetime_utils import naive_utc_now
 from models import Account
@@ -94,11 +94,6 @@ class PrunePausesTestCase:
 def pause_workflow_failure_cases() -> list[PauseWorkflowFailureCase]:
     """Create test cases for pause workflow failure scenarios."""
     return [
-        PauseWorkflowFailureCase(
-            name="pause_already_paused_workflow",
-            initial_status=WorkflowExecutionStatus.PAUSED,
-            description="Should fail to pause an already paused workflow",
-        ),
         PauseWorkflowFailureCase(
             name="pause_completed_workflow",
             initial_status=WorkflowExecutionStatus.SUCCEEDED,
@@ -684,9 +679,12 @@ class TestWorkflowPauseIntegration:
 
         # Verify only 3 were deleted
         remaining_count = (
-            self.session.query(WorkflowPauseModel)
-            .filter(WorkflowPauseModel.id.in_([pe.id for pe in pause_entities]))
-            .count()
+            self.session.scalar(
+                select(func.count(WorkflowPauseModel.id)).where(
+                    WorkflowPauseModel.id.in_([pe.id for pe in pause_entities])
+                )
+            )
+            or 0
         )
         assert remaining_count == 2
 
