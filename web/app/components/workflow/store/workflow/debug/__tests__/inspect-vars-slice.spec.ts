@@ -1,5 +1,6 @@
 import type { VarInInspect } from '@/types/workflow'
 import { createStore } from 'zustand/vanilla'
+import { createStartNode } from '@/app/components/workflow/__tests__/fixtures'
 import { BlockEnum, VarType } from '@/app/components/workflow/types'
 import { VarInInspectType } from '@/types/workflow'
 import { createInspectVarsSlice } from '../inspect-vars-slice'
@@ -31,7 +32,7 @@ describe('createInspectVarsSlice', () => {
     store.getState().setNodesWithInspectVars([
       {
         nodeId: 'node-1',
-        nodePayload: { type: BlockEnum.Start, title: 'Start', desc: '' } as never,
+        nodePayload: createStartNode().data,
         nodeType: BlockEnum.Start,
         title: 'Start',
         vars: [],
@@ -53,33 +54,38 @@ describe('createInspectVarsSlice', () => {
     store.getState().setNodesWithInspectVars([
       {
         nodeId: 'node-1',
-        nodePayload: { type: BlockEnum.Start, title: 'Start', desc: '' } as never,
+        nodePayload: createStartNode().data,
         nodeType: BlockEnum.Start,
         title: 'Start',
-        vars: [createInspectVar()],
+        vars: [
+          createInspectVar(),
+          createInspectVar({ id: 'untouched', name: 'other', selector: ['node-1', 'other'] }),
+        ],
       },
     ])
 
     store.getState().setInspectVarValue('node-1', 'var-1', 'edited')
-    expect(store.getState().nodesWithInspectVars[0].vars[0]).toMatchObject({
+    expect(store.getState().nodesWithInspectVars[0]!.vars[0]).toMatchObject({
       value: 'edited',
       edited: true,
     })
 
     store.getState().renameInspectVarName('node-1', 'var-1', ['node-1', 'renamed'])
-    expect(store.getState().nodesWithInspectVars[0].vars[0]).toMatchObject({
+    expect(store.getState().nodesWithInspectVars[0]!.vars[0]).toMatchObject({
       name: 'renamed',
       selector: ['node-1', 'renamed'],
     })
 
     store.getState().resetToLastRunVar('node-1', 'var-1', 'restored')
-    expect(store.getState().nodesWithInspectVars[0].vars[0]).toMatchObject({
+    expect(store.getState().nodesWithInspectVars[0]!.vars[0]).toMatchObject({
       value: 'restored',
       edited: false,
     })
 
     store.getState().deleteInspectVar('node-1', 'var-1')
-    expect(store.getState().nodesWithInspectVars[0].vars).toEqual([])
+    expect(store.getState().nodesWithInspectVars[0]!.vars).toEqual([
+      createInspectVar({ id: 'untouched', name: 'other', selector: ['node-1', 'other'] }),
+    ])
 
     store.getState().deleteNodeInspectVars('node-1')
     expect(store.getState().nodesWithInspectVars).toEqual([])
@@ -87,7 +93,7 @@ describe('createInspectVarsSlice', () => {
     store.getState().setNodesWithInspectVars([
       {
         nodeId: 'node-2',
-        nodePayload: { type: BlockEnum.Start, title: 'Start', desc: '' } as never,
+        nodePayload: createStartNode().data,
         nodeType: BlockEnum.Start,
         title: 'Start',
         vars: [createInspectVar({ id: 'var-2' })],

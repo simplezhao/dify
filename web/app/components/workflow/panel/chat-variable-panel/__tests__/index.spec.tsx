@@ -1,32 +1,40 @@
+import type { ReactElement, ReactNode } from 'react'
+import type { CodeNodeType } from '@/app/components/workflow/nodes/code/types'
 import type { ConversationVariable, Node } from '@/app/components/workflow/types'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useLayoutEffect } from 'react'
+import { ReactFlowProvider, useStoreApi } from 'reactflow'
+import { renderWorkflowComponent } from '@/app/components/workflow/__tests__/workflow-test-env'
 import ChatVariablePanel from '../index'
 import { ChatVarType } from '../type'
 
-type MockWorkflowStoreState = {
-  setShowChatVariablePanel: (value: boolean) => void
-  conversationVariables: ConversationVariable[]
-  setConversationVariables: (value: ConversationVariable[]) => void
-}
-
-type MockFlowStore = {
-  getNodes: () => Node[]
-  setNodes: (nodes: Node[]) => void
-}
-
-const mockSetShowChatVariablePanel = vi.fn()
-const mockSetConversationVariables = vi.fn()
-const mockDoSyncWorkflowDraft = vi.fn((_sync: boolean, options?: { onSuccess?: () => void }) => {
-  options?.onSuccess?.()
-})
 const mockInvalidateConversationVarValues = vi.fn()
-const mockFindUsedVarNodes = vi.fn<(selector: string[], nodes: Node[]) => Node[]>()
-const mockUpdateNodeVars = vi.fn<(node: Node, current: string[], next: string[]) => Node>()
+const mockUpdateConversationVariables = vi.fn().mockResolvedValue(undefined)
 
 let mockConversationVariables: ConversationVariable[] = []
-let mockFlowNodes: Node[] = []
-const mockSetNodes = vi.fn<(nodes: Node[]) => void>()
+let mockFlowNodes: Node<CodeNodeType>[] = []
+let flowStore: ReturnType<typeof useStoreApi>
+function FlowFixture({ children }: { children: ReactNode }) {
+  const store = useStoreApi()
+  useLayoutEffect(() => {
+    flowStore = store
+    store.getState().setNodes(mockFlowNodes)
+  }, [store])
+  return children
+}
+const render = (ui: ReactElement) =>
+  renderWorkflowComponent(
+    <ReactFlowProvider>
+      <FlowFixture>{ui}</FlowFixture>
+    </ReactFlowProvider>,
+    {
+      initialStoreState: {
+        conversationVariables: mockConversationVariables,
+        showChatVariablePanel: true,
+      },
+    },
+  )
 
 const createConversationVariable = (
   overrides: Partial<ConversationVariable> = {},
@@ -39,49 +47,30 @@ const createConversationVariable = (
   ...overrides,
 })
 
-const createNode = (id: string): Node => ({
+const createNode = (id: string): Node<CodeNodeType> => ({
   id,
   type: 'custom',
   position: { x: 0, y: 0 },
   data: {
     title: id,
     desc: '',
-    type: 'llm' as Node['data']['type'],
+    type: 'code',
+    code_language: 'python3',
+    code: '',
+    outputs: {},
+    variables: [],
   },
 })
 
-vi.mock('reactflow', () => ({
-  useStoreApi: () => ({
-    getState: (): MockFlowStore => ({
-      getNodes: () => mockFlowNodes,
-      setNodes: mockSetNodes,
-    }),
-  }),
-}))
-
-vi.mock('@/app/components/workflow/store', () => ({
-  useStore: <T,>(selector: (state: MockWorkflowStoreState) => T) => selector({
-    setShowChatVariablePanel: mockSetShowChatVariablePanel,
-    conversationVariables: mockConversationVariables,
-    setConversationVariables: mockSetConversationVariables,
-  }),
-}))
-
-vi.mock('@/app/components/workflow/hooks/use-nodes-sync-draft', () => ({
-  useNodesSyncDraft: () => ({
-    doSyncWorkflowDraft: mockDoSyncWorkflowDraft,
-  }),
+vi.mock('@/service/workflow', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/service/workflow')>()),
+  updateConversationVariables: (...args: unknown[]) => mockUpdateConversationVariables(...args),
 }))
 
 vi.mock('../../../hooks/use-inspect-vars-crud', () => ({
   default: () => ({
     invalidateConversationVarValues: mockInvalidateConversationVarValues,
   }),
-}))
-
-vi.mock('@/app/components/workflow/nodes/_base/components/variable/utils', () => ({
-  findUsedVarNodes: (...args: Parameters<typeof mockFindUsedVarNodes>) => mockFindUsedVarNodes(...args),
-  updateNodeVars: (...args: Parameters<typeof mockUpdateNodeVars>) => mockUpdateNodeVars(...args),
 }))
 
 vi.mock('@/app/components/workflow/panel/chat-variable-panel/components/variable-item', () => ({
@@ -102,161 +91,178 @@ vi.mock('@/app/components/workflow/panel/chat-variable-panel/components/variable
   ),
 }))
 
-vi.mock('@/app/components/workflow/panel/chat-variable-panel/components/variable-modal-trigger', () => ({
-  default: ({
-    open,
-    showTip,
-    chatVar,
-    onSave,
-    onClose,
-  }: {
-    open: boolean
-    showTip: boolean
-    chatVar?: ConversationVariable
-    onSave: (chatVar: ConversationVariable) => void
-    onClose: () => void
-  }) => (
-    <div data-testid="variable-modal-trigger">
-      <span>{open ? 'open' : 'closed'}</span>
-      <span>{showTip ? 'tip-on' : 'tip-off'}</span>
-      <span>{chatVar?.name || 'new-variable'}</span>
-      <button
-        type="button"
-        onClick={() => onSave({
-          id: 'var-added',
-          name: 'fresh_var',
-          value_type: ChatVarType.String,
-          value: '',
-          description: 'Added variable',
-        })}
-      >
-        save-add
-      </button>
-      {chatVar && (
+vi.mock(
+  '@/app/components/workflow/panel/chat-variable-panel/components/variable-modal-trigger',
+  () => ({
+    default: ({
+      open,
+      showTip,
+      chatVar,
+      onSave,
+      onClose,
+    }: {
+      open: boolean
+      showTip: boolean
+      chatVar?: ConversationVariable
+      onSave: (chatVar: ConversationVariable) => void
+      onClose: () => void
+    }) => (
+      <div data-testid="variable-modal-trigger">
+        <span>{open ? 'open' : 'closed'}</span>
+        <span>{showTip ? 'tip-on' : 'tip-off'}</span>
+        <span>{chatVar?.name || 'new-variable'}</span>
         <button
           type="button"
-          onClick={() => onSave({
-            ...chatVar,
-            name: `${chatVar.name}_next`,
-          })}
+          onClick={() =>
+            onSave({
+              id: 'var-added',
+              name: 'fresh_var',
+              value_type: ChatVarType.String,
+              value: '',
+              description: 'Added variable',
+            })
+          }
         >
-          save-edit
+          save-add
         </button>
-      )}
-      <button type="button" onClick={onClose}>close-trigger</button>
-    </div>
-  ),
-}))
-
-vi.mock('@/app/components/workflow/nodes/_base/components/remove-effect-var-confirm', () => ({
-  default: ({
-    isShow,
-    onConfirm,
-    onCancel,
-  }: {
-    isShow: boolean
-    onConfirm: () => void
-    onCancel: () => void
-  }) => {
-    if (!isShow)
-      return null
-
-    return (
-      <div data-testid="remove-effect-var-confirm">
-        <button type="button" onClick={onConfirm}>confirm-remove</button>
-        <button type="button" onClick={onCancel}>cancel-remove</button>
+        {chatVar && (
+          <button
+            type="button"
+            onClick={() =>
+              onSave({
+                ...chatVar,
+                name: `${chatVar.name}_next`,
+              })
+            }
+          >
+            save-edit
+          </button>
+        )}
+        <button type="button" onClick={onClose}>
+          close-trigger
+        </button>
       </div>
-    )
-  },
-}))
+    ),
+  }),
+)
 
 describe('ChatVariablePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockConversationVariables = [createConversationVariable()]
     mockFlowNodes = [createNode('node-1'), createNode('node-2')]
-    mockFindUsedVarNodes.mockReturnValue([])
-    mockUpdateNodeVars.mockImplementation((node: Node) => node)
+    mockUpdateConversationVariables.mockResolvedValue(undefined)
   })
 
   it('should toggle the tips area and close the panel', async () => {
     const user = userEvent.setup()
-    const { container } = render(<ChatVariablePanel />)
+    const { store } = render(<ChatVariablePanel />)
 
     expect(screen.getByText('workflow.chatVariable.panelDescription')).toBeInTheDocument()
 
-    const toggleTipButton = screen.getAllByRole('button')[0]!
+    const toggleTipButton = screen.getByRole('button', {
+      name: 'workflow.chatVariable.tips',
+      expanded: true,
+    })
     await user.click(toggleTipButton)
     expect(screen.queryByText('workflow.chatVariable.panelDescription')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: 'workflow.chatVariable.tips',
+        expanded: false,
+      }),
+    ).toBeInTheDocument()
 
-    const closeButton = container.querySelector('.flex.h-6.w-6.cursor-pointer.items-center.justify-center') as HTMLElement
-    await user.click(closeButton)
+    await user.click(screen.getByRole('button', { name: 'common.operation.close' }))
 
-    expect(mockSetShowChatVariablePanel).toHaveBeenCalledWith(false)
+    expect(store.getState().showChatVariablePanel).toBe(false)
   })
 
   it('should prepend newly added variables and sync the workflow draft', async () => {
     const user = userEvent.setup()
 
-    render(<ChatVariablePanel />)
+    const { store } = render(<ChatVariablePanel />)
 
     await user.click(screen.getByRole('button', { name: 'save-add' }))
 
     await waitFor(() => {
-      expect(mockSetConversationVariables).toHaveBeenCalledWith([
+      expect(store.getState().conversationVariables).toEqual([
         expect.objectContaining({ id: 'var-added', name: 'fresh_var' }),
         createConversationVariable(),
       ])
+      expect(mockUpdateConversationVariables).toHaveBeenCalledWith({
+        appId: 'app-1',
+        conversationVariables: [
+          expect.objectContaining({ id: 'var-added', name: 'fresh_var' }),
+          createConversationVariable(),
+        ],
+      })
+      expect(mockInvalidateConversationVarValues).toHaveBeenCalledTimes(1)
     })
-    expect(mockDoSyncWorkflowDraft).toHaveBeenCalledTimes(1)
-    expect(mockInvalidateConversationVarValues).toHaveBeenCalledTimes(1)
   })
 
   it('should rename existing variables and update affected node references', async () => {
     const user = userEvent.setup()
-    const effectedNode = createNode('node-1')
-    const updatedNode = createNode('node-1-updated')
+    mockFlowNodes[0]!.data.variables = [
+      { variable: 'topic', value_selector: ['conversation', 'conversation_var'] },
+    ]
+    const updatedNode = {
+      ...createNode('node-1'),
+      data: {
+        ...createNode('node-1').data,
+        variables: [
+          { variable: 'topic', value_selector: ['conversation', 'conversation_var_next'] },
+        ],
+      },
+    }
 
-    mockFindUsedVarNodes.mockReturnValue([effectedNode])
-    mockUpdateNodeVars.mockReturnValue(updatedNode)
-
-    render(<ChatVariablePanel />)
+    const { store } = render(<ChatVariablePanel />)
 
     await user.click(screen.getByRole('button', { name: 'edit-conversation_var' }))
     await user.click(screen.getByRole('button', { name: 'save-edit' }))
 
-    expect(mockSetConversationVariables).toHaveBeenCalledWith([
+    expect(store.getState().conversationVariables).toEqual([
       expect.objectContaining({ id: 'var-1', name: 'conversation_var_next' }),
     ])
-    expect(mockUpdateNodeVars).toHaveBeenCalledWith(
-      effectedNode,
-      ['conversation', 'conversation_var'],
-      ['conversation', 'conversation_var_next'],
-    )
-    expect(mockSetNodes).toHaveBeenCalledWith([updatedNode, createNode('node-2')])
+    expect(flowStore.getState().getNodes()).toEqual([
+      expect.objectContaining(updatedNode),
+      expect.objectContaining(createNode('node-2')),
+    ])
+    expect(store.getState().controlPromptEditorRerenderKey).toBeGreaterThan(0)
   })
 
   it('should require confirmation before deleting variables referenced by workflow nodes', async () => {
     const user = userEvent.setup()
-    const effectedNode = createNode('node-1')
-    const prunedNode = createNode('node-1-pruned')
+    mockFlowNodes[0]!.data.variables = [
+      { variable: 'topic', value_selector: ['conversation', 'conversation_var'] },
+    ]
+    const prunedNode = {
+      ...createNode('node-1'),
+      data: {
+        ...createNode('node-1').data,
+        variables: [{ variable: 'topic', value_selector: [] }],
+      },
+    }
 
-    mockFindUsedVarNodes.mockReturnValue([effectedNode])
-    mockUpdateNodeVars.mockReturnValue(prunedNode)
-
-    render(<ChatVariablePanel />)
+    const { store } = render(<ChatVariablePanel />)
 
     await user.click(screen.getByRole('button', { name: 'delete-conversation_var' }))
-    expect(screen.getByTestId('remove-effect-var-confirm')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'confirm-remove' }))
-
-    expect(mockUpdateNodeVars).toHaveBeenCalledWith(
-      effectedNode,
-      ['conversation', 'conversation_var'],
-      [],
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    expect(mockUpdateConversationVariables).not.toHaveBeenCalled()
+    expect(store.getState().conversationVariables).toEqual(mockConversationVariables)
+    await user.click(screen.getByRole('button', { name: 'common.operation.cancel' }))
+    expect(store.getState().conversationVariables).toEqual(mockConversationVariables)
+    expect(flowStore.getState().getNodes()[0]!.data.variables).toEqual(
+      mockFlowNodes[0]!.data.variables,
     )
-    expect(mockSetNodes).toHaveBeenCalledWith([prunedNode, createNode('node-2')])
-    expect(mockSetConversationVariables).toHaveBeenCalledWith([])
+    await user.click(screen.getByRole('button', { name: 'delete-conversation_var' }))
+
+    await user.click(screen.getByRole('button', { name: 'common.operation.confirm' }))
+
+    expect(flowStore.getState().getNodes()).toEqual([
+      expect.objectContaining(prunedNode),
+      expect.objectContaining(createNode('node-2')),
+    ])
+    expect(store.getState().conversationVariables).toEqual([])
   })
 })
