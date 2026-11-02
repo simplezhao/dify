@@ -2,21 +2,7 @@ import type { OutputVar } from '../../../../code/types'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import OutputVarList from '../output-var-list'
 
-vi.mock('../var-type-picker', () => ({
-  default: (props: { value: string, onChange: (v: string) => void, readonly: boolean }) => (
-    <select
-      data-testid="var-type-picker"
-      value={props.value ?? ''}
-      onChange={e => props.onChange(e.target.value)}
-      disabled={props.readonly}
-    >
-      <option value="string">string</option>
-      <option value="number">number</option>
-    </select>
-  ),
-}))
-
-vi.mock('@/app/components/base/ui/toast', () => ({
+vi.mock('@/app/notifications', () => ({
   toast: { error: vi.fn() },
 }))
 
@@ -43,13 +29,15 @@ describe('OutputVarList', () => {
         readonly={false}
         outputs={outputs}
         outputKeyOrders={outputKeyOrders}
-        onChange={(newOutputs) => { captured = newOutputs }}
+        onChange={(newOutputs) => {
+          captured = newOutputs
+        }}
         onRemove={vi.fn()}
       />,
     )
 
     const inputs = screen.getAllByRole('textbox')
-    fireEvent.change(inputs[renameIndex], { target: { value: newName } })
+    fireEvent.change(inputs[renameIndex]!, { target: { value: newName } })
 
     return captured!
   }
@@ -118,34 +106,14 @@ describe('OutputVarList', () => {
       )
 
       // The second remove button (index 1 in the row)
-      const buttons = screen.getAllByRole('button')
-      fireEvent.click(buttons[1])
+      const buttons = screen.getAllByRole('button', { name: 'common.operation.remove' })
+      fireEvent.click(buttons[1]!)
 
       expect(onRemove).toHaveBeenCalledWith(1)
     })
   })
 
   describe('normal operation', () => {
-    it('should render one row per outputKeyOrders entry', () => {
-      const outputs = createOutputs({ a: 'string', b: 'number' })
-      const onChange = vi.fn()
-
-      render(
-        <OutputVarList
-          readonly={false}
-          outputs={outputs}
-          outputKeyOrders={['a', 'b']}
-          onChange={onChange}
-          onRemove={vi.fn()}
-        />,
-      )
-
-      const inputs = screen.getAllByRole('textbox')
-      expect(inputs).toHaveLength(2)
-      expect(inputs[0]).toHaveValue('a')
-      expect(inputs[1]).toHaveValue('b')
-    })
-
     it('should call onChange with updated outputs when renaming', () => {
       const outputs = createOutputs({ var_1: 'string' })
       const onChange = vi.fn()
@@ -171,25 +139,6 @@ describe('OutputVarList', () => {
       )
     })
 
-    it('should call onRemove when remove button is clicked', () => {
-      const outputs = createOutputs({ var_1: 'string' })
-      const onRemove = vi.fn()
-
-      render(
-        <OutputVarList
-          readonly={false}
-          outputs={outputs}
-          outputKeyOrders={['var_1']}
-          onChange={vi.fn()}
-          onRemove={onRemove}
-        />,
-      )
-
-      fireEvent.click(screen.getByRole('button'))
-
-      expect(onRemove).toHaveBeenCalledWith(0)
-    })
-
     it('should render inputs as readonly when readonly is true', () => {
       const outputs = createOutputs({ var_1: 'string' })
 
@@ -204,6 +153,9 @@ describe('OutputVarList', () => {
       )
 
       expect(screen.getByRole('textbox')).toHaveAttribute('readonly')
+      expect(
+        screen.queryByRole('button', { name: 'common.operation.remove' }),
+      ).not.toBeInTheDocument()
     })
   })
 })

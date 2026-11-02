@@ -3,6 +3,10 @@ coverage:
     project:
       default:
         target: auto
+        # Absorb sub-percent coverage noise (rounding, trivial added lines, CVA variants, etc).
+        threshold: 1%
+        # Deleting covered code during refactors/migrations must not regress base.
+        removed_code_behavior: adjust_base
 
 flags:
   web:
@@ -10,7 +14,17 @@ flags:
       - "web/"
     carryforward: true
 
+  dify-ui:
+    paths:
+      - "packages/dify-ui/"
+    carryforward: true
+
   api:
     paths:
       - "api/"
+    carryforward: true
+
+  cli:
+    paths:
+      - "cli/"
     carryforward: true

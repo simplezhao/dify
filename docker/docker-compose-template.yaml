@@ -1,4 +1,251 @@
-x-shared-env: &shared-api-worker-env
+# Shared configuration using YAML anchors and env_file
+x-shared-api-worker-config: &shared-api-worker-config
+  env_file:
+    - ./envs/core-services/shared.defaults
+    - path: ./envs/core-services/shared.env
+      required: false
+    - path: ./envs/core-services/api.env
+      required: false
+    - path: ./envs/security.env
+      required: false
+    - path: ./envs/databases/db-postgres.env
+      required: false
+    - path: ./envs/databases/db-mysql.env
+      required: false
+    - path: ./envs/databases/redis.env
+      required: false
+    - path: ./envs/vectorstores/weaviate.env
+      required: false
+    - path: ./envs/vectorstores/qdrant.env
+      required: false
+    - path: ./envs/vectorstores/oceanbase.env
+      required: false
+    - path: ./envs/vectorstores/seekdb.env
+      required: false
+    - path: ./envs/vectorstores/couchbase.env
+      required: false
+    - path: ./envs/vectorstores/pgvector.env
+      required: false
+    - path: ./envs/vectorstores/vastbase.env
+      required: false
+    - path: ./envs/vectorstores/pgvecto-rs.env
+      required: false
+    - path: ./envs/vectorstores/chroma.env
+      required: false
+    - path: ./envs/vectorstores/iris.env
+      required: false
+    - path: ./envs/vectorstores/oracle.env
+      required: false
+    - path: ./envs/vectorstores/opengauss.env
+      required: false
+    - path: ./envs/vectorstores/myscale.env
+      required: false
+    - path: ./envs/vectorstores/matrixone.env
+      required: false
+    - path: ./envs/vectorstores/elasticsearch.env
+      required: false
+    - path: ./envs/vectorstores/opensearch.env
+      required: false
+    - path: ./envs/vectorstores/milvus.env
+      required: false
+    - path: ./envs/infrastructure/nginx.env
+      required: false
+    - path: ./envs/infrastructure/certbot.env
+      required: false
+    - path: ./envs/infrastructure/ssrf-proxy.env
+      required: false
+    - path: ./envs/infrastructure/etcd.env
+      required: false
+    - path: ./envs/infrastructure/minio.env
+      required: false
+    - path: ./envs/infrastructure/milvus-standalone.env
+      required: false
+    - ./.env
+  networks:
+    - ssrf_proxy_network
+    - default
+  restart: always
+
+x-shared-worker-config: &shared-worker-config
+  env_file:
+    - ./envs/core-services/shared.defaults
+    - path: ./envs/core-services/shared.env
+      required: false
+    - path: ./envs/core-services/worker.env
+      required: false
+    - path: ./envs/security.env
+      required: false
+    - path: ./envs/databases/db-postgres.env
+      required: false
+    - path: ./envs/databases/db-mysql.env
+      required: false
+    - path: ./envs/databases/redis.env
+      required: false
+    - path: ./envs/vectorstores/weaviate.env
+      required: false
+    - path: ./envs/vectorstores/qdrant.env
+      required: false
+    - path: ./envs/vectorstores/oceanbase.env
+      required: false
+    - path: ./envs/vectorstores/seekdb.env
+      required: false
+    - path: ./envs/vectorstores/couchbase.env
+      required: false
+    - path: ./envs/vectorstores/pgvector.env
+      required: false
+    - path: ./envs/vectorstores/vastbase.env
+      required: false
+    - path: ./envs/vectorstores/pgvecto-rs.env
+      required: false
+    - path: ./envs/vectorstores/chroma.env
+      required: false
+    - path: ./envs/vectorstores/iris.env
+      required: false
+    - path: ./envs/vectorstores/oracle.env
+      required: false
+    - path: ./envs/vectorstores/opengauss.env
+      required: false
+    - path: ./envs/vectorstores/myscale.env
+      required: false
+    - path: ./envs/vectorstores/matrixone.env
+      required: false
+    - path: ./envs/vectorstores/elasticsearch.env
+      required: false
+    - path: ./envs/vectorstores/opensearch.env
+      required: false
+    - path: ./envs/vectorstores/milvus.env
+      required: false
+    - path: ./envs/infrastructure/nginx.env
+      required: false
+    - path: ./envs/infrastructure/certbot.env
+      required: false
+    - path: ./envs/infrastructure/ssrf-proxy.env
+      required: false
+    - path: ./envs/infrastructure/etcd.env
+      required: false
+    - path: ./envs/infrastructure/minio.env
+      required: false
+    - path: ./envs/infrastructure/milvus-standalone.env
+      required: false
+    - ./.env
+  networks:
+    - ssrf_proxy_network
+    - default
+  restart: always
+
+# KNOWLEDGE_FS_WORKER_IMAGE must bundle the KnowledgeFS engine at KNOWLEDGE_FS_BACKGROUND_ENGINE_PATH;
+# standard Dify API images do not, and the worker entrypoint exits without it.
+x-knowledge-fs-celery-worker: &knowledge-fs-celery-worker
+  image: ${KNOWLEDGE_FS_WORKER_IMAGE:-langgenius/dify-api:1.18.0}
+  profiles:
+    - knowledge-fs-celery
+  restart: always
+  # Match the two-hour default task deadline plus shutdown margin for long document jobs.
+  stop_grace_period: 125m
+  env_file:
+    - ./envs/core-services/shared.defaults
+    - path: ./envs/core-services/shared.env
+      required: false
+    - path: ./envs/core-services/worker.env
+      required: false
+    - path: ./envs/security.env
+      required: false
+    - path: ./envs/databases/db-postgres.env
+      required: false
+    - path: ./envs/databases/db-mysql.env
+      required: false
+    - path: ./envs/databases/redis.env
+      required: false
+    - path: ./envs/core-services/knowledge-fs.env
+      required: false
+    - path: ./envs/core-services/knowledge-fs-worker.env
+      required: false
+    - ./.env
+  environment: &knowledge-fs-celery-environment
+    MODE: worker
+    MIGRATION_ENABLED: "false"
+    CELERY_WORKER_POOL: prefork
+    CELERY_PREFETCH_MULTIPLIER: "1"
+    # Periodic database sweeps are cheap Celery tasks; the standard 50-task recycling would
+    # repeatedly discard a warm engine even while idle.
+    MAX_TASKS_PER_CHILD: ${KNOWLEDGE_FS_WORKER_MAX_TASKS_PER_CHILD:-1000}
+    DIFY_INNER_API_URL: ${PLUGIN_DIFY_INNER_API_URL:-http://api:5001}
+    DIFY_INNER_API_KEY: ${PLUGIN_DIFY_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}
+    KNOWLEDGE_INTEGRATED_MODE_ENABLED: ${KNOWLEDGE_INTEGRATED_MODE_ENABLED:-true}
+    KNOWLEDGE_DIRECT_UPLOAD_ENABLED: ${KNOWLEDGE_DIRECT_UPLOAD_ENABLED:-true}
+  depends_on:
+    api:
+      condition: service_healthy
+  networks:
+    - default
+
+x-shared-worker-beat-config: &shared-worker-beat-config
+  env_file:
+    - ./envs/core-services/shared.defaults
+    - path: ./envs/core-services/shared.env
+      required: false
+    - path: ./envs/core-services/worker-beat.env
+      required: false
+    - path: ./envs/security.env
+      required: false
+    - path: ./envs/databases/db-postgres.env
+      required: false
+    - path: ./envs/databases/db-mysql.env
+      required: false
+    - path: ./envs/databases/redis.env
+      required: false
+    - path: ./envs/vectorstores/weaviate.env
+      required: false
+    - path: ./envs/vectorstores/qdrant.env
+      required: false
+    - path: ./envs/vectorstores/oceanbase.env
+      required: false
+    - path: ./envs/vectorstores/seekdb.env
+      required: false
+    - path: ./envs/vectorstores/couchbase.env
+      required: false
+    - path: ./envs/vectorstores/pgvector.env
+      required: false
+    - path: ./envs/vectorstores/vastbase.env
+      required: false
+    - path: ./envs/vectorstores/pgvecto-rs.env
+      required: false
+    - path: ./envs/vectorstores/chroma.env
+      required: false
+    - path: ./envs/vectorstores/iris.env
+      required: false
+    - path: ./envs/vectorstores/oracle.env
+      required: false
+    - path: ./envs/vectorstores/opengauss.env
+      required: false
+    - path: ./envs/vectorstores/myscale.env
+      required: false
+    - path: ./envs/vectorstores/matrixone.env
+      required: false
+    - path: ./envs/vectorstores/elasticsearch.env
+      required: false
+    - path: ./envs/vectorstores/opensearch.env
+      required: false
+    - path: ./envs/vectorstores/milvus.env
+      required: false
+    - path: ./envs/infrastructure/nginx.env
+      required: false
+    - path: ./envs/infrastructure/certbot.env
+      required: false
+    - path: ./envs/infrastructure/ssrf-proxy.env
+      required: false
+    - path: ./envs/infrastructure/etcd.env
+      required: false
+    - path: ./envs/infrastructure/minio.env
+      required: false
+    - path: ./envs/infrastructure/milvus-standalone.env
+      required: false
+    - ./.env
+  networks:
+    - ssrf_proxy_network
+    - default
+  restart: always
+
 services:
   # Init container to fix permissions
   init_permissions:
@@ -21,13 +268,12 @@ services:
 
   # API service
   api:
-    image: langgenius/dify-api:1.13.3
-    restart: always
+    <<: *shared-api-worker-config
+    image: langgenius/dify-api:1.18.0
     environment:
-      # Use the shared environment variables.
-      <<: *shared-api-worker-env
-      # Startup mode, 'api' starts the API server.
       MODE: api
+      # The bundled Nginx supplies a verified client IP; keep direct API callers trusted.
+      RESPECT_XFORWARD_HEADERS_ENABLED: ${RESPECT_XFORWARD_HEADERS_ENABLED:-true}
       SENTRY_DSN: ${API_SENTRY_DSN:-}
       SENTRY_TRACES_SAMPLE_RATE: ${API_SENTRY_TRACES_SAMPLE_RATE:-1.0}
       SENTRY_PROFILES_SAMPLE_RATE: ${API_SENTRY_PROFILES_SAMPLE_RATE:-1.0}
@@ -36,6 +282,8 @@ services:
       PLUGIN_MAX_PACKAGE_SIZE: ${PLUGIN_MAX_PACKAGE_SIZE:-52428800}
       PLUGIN_DAEMON_TIMEOUT: ${PLUGIN_DAEMON_TIMEOUT:-600.0}
       INNER_API_KEY_FOR_PLUGIN: ${PLUGIN_DIFY_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}
+      AGENT_BACKEND_BASE_URL: ${AGENT_BACKEND_BASE_URL:-http://agent_backend:5050}
+      AGENT_BACKEND_API_TOKEN: ${DIFY_AGENT_API_TOKEN:-dify-agent-run-token-for-dev-only}
     depends_on:
       init_permissions:
         condition: service_completed_successfully
@@ -53,6 +301,8 @@ services:
         required: false
       redis:
         condition: service_started
+      agent_backend:
+        condition: service_started
     volumes:
       # Mount the storage directory to the container, for storing user files.
       - ./volumes/app/storage:/app/api/storage
@@ -66,21 +316,51 @@ services:
       - ssrf_proxy_network
       - default
 
+  # WebSocket service for workflow collaboration.
+  api_websocket:
+    <<: *shared-api-worker-config
+    image: langgenius/dify-api:1.18.0
+    profiles:
+      - collaboration
+    environment:
+      MODE: api
+      RESPECT_XFORWARD_HEADERS_ENABLED: ${RESPECT_XFORWARD_HEADERS_ENABLED:-true}
+      SERVER_WORKER_AMOUNT: ${API_WEBSOCKET_WORKER_AMOUNT:-1}
+      SERVER_WORKER_CLASS: ${API_WEBSOCKET_WORKER_CLASS:-geventwebsocket.gunicorn.workers.GeventWebSocketWorker}
+      SERVER_WORKER_CONNECTIONS: ${API_WEBSOCKET_WORKER_CONNECTIONS:-1000}
+      GUNICORN_TIMEOUT: ${API_WEBSOCKET_GUNICORN_TIMEOUT:-360}
+    depends_on:
+      init_permissions:
+        condition: service_completed_successfully
+      db_postgres:
+        condition: service_healthy
+        required: false
+      db_mysql:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_started
+    volumes:
+      # Mount the storage directory to the container, for storing user files.
+      - ./volumes/app/storage:/app/api/storage
+    networks:
+      - ssrf_proxy_network
+      - default
+
   # worker service
   # The Celery worker for processing all queues (dataset, workflow, mail, etc.)
   worker:
-    image: langgenius/dify-api:1.13.3
-    restart: always
+    <<: *shared-worker-config
+    image: langgenius/dify-api:1.18.0
     environment:
-      # Use the shared environment variables.
-      <<: *shared-api-worker-env
-      # Startup mode, 'worker' starts the Celery worker for processing all queues.
       MODE: worker
       SENTRY_DSN: ${API_SENTRY_DSN:-}
       SENTRY_TRACES_SAMPLE_RATE: ${API_SENTRY_TRACES_SAMPLE_RATE:-1.0}
       SENTRY_PROFILES_SAMPLE_RATE: ${API_SENTRY_PROFILES_SAMPLE_RATE:-1.0}
       PLUGIN_MAX_PACKAGE_SIZE: ${PLUGIN_MAX_PACKAGE_SIZE:-52428800}
       INNER_API_KEY_FOR_PLUGIN: ${PLUGIN_DIFY_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}
+      AGENT_BACKEND_BASE_URL: ${AGENT_BACKEND_BASE_URL:-http://agent_backend:5050}
+      AGENT_BACKEND_API_TOKEN: ${DIFY_AGENT_API_TOKEN:-dify-agent-run-token-for-dev-only}
     depends_on:
       init_permissions:
         condition: service_completed_successfully
@@ -97,6 +377,8 @@ services:
         condition: service_healthy
         required: false
       redis:
+        condition: service_started
+      agent_backend:
         condition: service_started
     volumes:
       # Mount the storage directory to the container, for storing user files.
@@ -112,15 +394,45 @@ services:
       - ssrf_proxy_network
       - default
 
+  # Dedicated worker for click-time Dataset snapshots and KnowledgeFS upgrade orchestration.
+  # Keep this queue out of the generic worker so large file copies cannot starve existing jobs.
+  worker_knowledge_fs_upgrade:
+    <<: *shared-worker-config
+    image: langgenius/dify-api:1.18.0
+    profiles:
+      - knowledge-fs
+    environment:
+      MODE: worker
+      CELERY_WORKER_QUEUES: knowledge_fs_upgrade
+      CELERY_WORKER_POOL: prefork
+      CELERY_WORKER_CONCURRENCY: ${KNOWLEDGE_FS_UPGRADE_WORKER_AMOUNT:-2}
+      CELERY_PREFETCH_MULTIPLIER: 1
+      SENTRY_DSN: ${API_SENTRY_DSN:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${API_SENTRY_TRACES_SAMPLE_RATE:-1.0}
+      SENTRY_PROFILES_SAMPLE_RATE: ${API_SENTRY_PROFILES_SAMPLE_RATE:-1.0}
+    depends_on:
+      init_permissions:
+        condition: service_completed_successfully
+      db_postgres:
+        condition: service_healthy
+        required: false
+      db_mysql:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_started
+    volumes:
+      - ./volumes/app/storage:/app/api/storage
+    networks:
+      - ssrf_proxy_network
+      - default
+
   # worker_beat service
   # Celery beat for scheduling periodic tasks.
   worker_beat:
-    image: langgenius/dify-api:1.13.3
-    restart: always
+    <<: *shared-worker-beat-config
+    image: langgenius/dify-api:1.18.0
     environment:
-      # Use the shared environment variables.
-      <<: *shared-api-worker-env
-      # Startup mode, 'worker_beat' starts the Celery beat for scheduling periodic tasks.
       MODE: beat
     depends_on:
       init_permissions:
@@ -152,25 +464,34 @@ services:
 
   # Frontend web application.
   web:
-    image: langgenius/dify-web:1.13.3
+    image: langgenius/dify-web:1.18.0
     restart: always
+    env_file:
+      - ./envs/core-services/shared.defaults
+      - path: ./envs/core-services/web.env
+        required: false
+      - path: ./envs/security.env
+        required: false
+      - ./.env
     environment:
       CONSOLE_API_URL: ${CONSOLE_API_URL:-}
+      SERVER_CONSOLE_API_URL: ${SERVER_CONSOLE_API_URL:-http://api:5001}
       APP_API_URL: ${APP_API_URL:-}
       AMPLITUDE_API_KEY: ${AMPLITUDE_API_KEY:-}
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
       NEXT_PUBLIC_COOKIE_DOMAIN: ${NEXT_PUBLIC_COOKIE_DOMAIN:-}
+      NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-ws://localhost}
       SENTRY_DSN: ${WEB_SENTRY_DSN:-}
       NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED:-0}
       EXPERIMENTAL_ENABLE_VINEXT: ${EXPERIMENTAL_ENABLE_VINEXT:-false}
       TEXT_GENERATION_TIMEOUT_MS: ${TEXT_GENERATION_TIMEOUT_MS:-60000}
       CSP_WHITELIST: ${CSP_WHITELIST:-}
       ALLOW_EMBED: ${ALLOW_EMBED:-false}
-      ALLOW_INLINE_STYLES: ${ALLOW_INLINE_STYLES:-false}
       ALLOW_UNSAFE_DATA_SCHEME: ${ALLOW_UNSAFE_DATA_SCHEME:-false}
       MARKETPLACE_API_URL: ${MARKETPLACE_API_URL:-https://marketplace.dify.ai}
       MARKETPLACE_URL: ${MARKETPLACE_URL:-https://marketplace.dify.ai}
-      TOP_K_MAX_VALUE: ${TOP_K_MAX_VALUE:-}
-      INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH: ${INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH:-}
+      TOP_K_MAX_VALUE: ${TOP_K_MAX_VALUE:-10}
+      INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH: ${INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH:-4000}
       LOOP_NODE_MAX_COUNT: ${LOOP_NODE_MAX_COUNT:-100}
       MAX_TOOLS_NUM: ${MAX_TOOLS_NUM:-10}
       MAX_PARALLEL_LIMIT: ${MAX_PARALLEL_LIMIT:-10}
@@ -192,7 +513,7 @@ services:
       POSTGRES_DB: ${DB_DATABASE:-dify}
       PGDATA: ${PGDATA:-/var/lib/postgresql/data/pgdata}
     command: >
-      postgres -c 'max_connections=${POSTGRES_MAX_CONNECTIONS:-100}'
+      postgres -c 'max_connections=${POSTGRES_MAX_CONNECTIONS:-200}'
                -c 'shared_buffers=${POSTGRES_SHARED_BUFFERS:-128MB}'
                -c 'work_mem=${POSTGRES_WORK_MEM:-4MB}'
                -c 'maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-64MB}'
@@ -227,7 +548,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-difyai123456}
       MYSQL_DATABASE: ${DB_DATABASE:-dify}
     command: >
-      --max_connections=1000
+      --max_connections=${MYSQL_MAX_CONNECTIONS:-1000}
       --innodb_buffer_pool_size=${MYSQL_INNODB_BUFFER_POOL_SIZE:-512M}
       --innodb_log_file_size=${MYSQL_INNODB_LOG_FILE_SIZE:-128M}
       --innodb_flush_log_at_trx_commit=${MYSQL_INNODB_FLUSH_LOG_AT_TRX_COMMIT:-2}
@@ -267,8 +588,14 @@ services:
 
   # The DifySandbox
   sandbox:
-    image: langgenius/dify-sandbox:0.2.14
+    image: langgenius/dify-sandbox:0.2.15
     restart: always
+    env_file:
+      - path: ./envs/core-services/sandbox.env
+        required: false
+      - path: ./envs/security.env
+        required: false
+      - ./.env
     environment:
       # The DifySandbox configurations
       # Make sure you are changing this key for your deployment with a strong key.
@@ -289,13 +616,62 @@ services:
     networks:
       - ssrf_proxy_network
 
+  # Local sandbox for Dify Agent shell workspaces.
+  # Network isolation: local_sandbox has NO direct route to `api`. Its only
+  # networks are `agent_sandbox_network` (so agent_backend can reach it on 5004
+  # for shellctl, and it can reach agent_backend directly) and
+  # `local_sandbox_proxy_network` (so its egress is forced through
+  # agent_ssrf_proxy).
+  # All non-agent_backend/localhost traffic goes through the Squid forward proxy
+  # on port 3128, which only allows agent_backend /agent-stub/ and the Dify API
+  # /files/* endpoints (see ssrf_proxy/squid-agent.conf.template).
+  local_sandbox:
+    image: langgenius/dify-agent-local-sandbox:1.18.0
+    command: ["shellctl", "serve", "--listen", "0.0.0.0:5004", "--require-auth-token"]
+    restart: always
+    env_file:
+      - path: ./envs/core-services/local-sandbox.env
+        required: false
+    environment:
+      - SHELLCTL_AUTH_TOKEN=${DIFY_AGENT_LOCAL_SANDBOX_AUTH_TOKEN:-${DIFY_AGENT_SHELLCTL_AUTH_TOKEN:-}}
+      - HTTP_PROXY=http://agent_ssrf_proxy:3128
+      - HTTPS_PROXY=http://agent_ssrf_proxy:3128
+      - NO_PROXY=localhost,127.0.0.1
+    volumes:
+      - dify_agent_local_sandbox_home:/home/dify
+      - dify_agent_local_sandbox_workspace:/workspace
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5004/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - agent_sandbox_network
+      - local_sandbox_proxy_network
+
   # plugin daemon
   plugin_daemon:
-    image: langgenius/dify-plugin-daemon:0.5.3-local
+    image: langgenius/dify-plugin-daemon:0.6.11-local
     restart: always
+    env_file:
+      - path: ./envs/core-services/shared.env
+        required: false
+      - path: ./envs/core-services/plugin-daemon.env
+        required: false
+      - path: ./envs/security.env
+        required: false
+      - path: ./envs/databases/db-postgres.env
+        required: false
+      - path: ./envs/databases/db-mysql.env
+        required: false
+      - path: ./envs/databases/redis.env
+        required: false
+      - ./.env
+    networks:
+      - ssrf_proxy_network
+      - default
     environment:
-      # Use the shared environment variables.
-      <<: *shared-api-worker-env
       DB_DATABASE: ${DB_PLUGIN_DATABASE:-dify_plugin}
       DB_SSL_MODE: ${DB_SSL_MODE:-disable}
       SERVER_PORT: ${PLUGIN_DAEMON_PORT:-5002}
@@ -361,14 +737,165 @@ services:
         condition: service_healthy
         required: false
 
+  # KnowledgeFS integration service. It is opt-in: add `knowledge-fs` to COMPOSE_PROFILES only after
+  # configuring envs/core-services/knowledge-fs.env (durable DATABASE_URL, migrations, verifier).
+  # It has no public port or nginx route. The published image is linux/amd64 only.
+  knowledge_fs:
+    image: ${KNOWLEDGE_FS_API_IMAGE:-langgenius/dify-knowledge-fs-api:deploy-konwledge}
+    profiles:
+      - knowledge-fs
+    restart: always
+    env_file:
+      - path: ./envs/core-services/knowledge-fs.env
+        required: false
+    environment:
+      DIFY_ROOT_KNOWLEDGE_BACKGROUND_EXECUTION_OVERRIDE: ${KNOWLEDGE_BACKGROUND_EXECUTION-}
+      DIFY_ROOT_KNOWLEDGE_DOCUMENT_MATERIALIZATION_MAX_CONCURRENCY_OVERRIDE: ${KNOWLEDGE_DOCUMENT_MATERIALIZATION_MAX_CONCURRENCY-}
+      # Canonical values stay in the service env/image. These whitelisted proxies let an explicitly
+      # set docker/.env value override them without injecting the complete root environment.
+      DIFY_ROOT_KNOWLEDGE_PDF_RASTERIZER_OVERRIDE: ${KNOWLEDGE_PDF_RASTERIZER-}
+      DIFY_ROOT_KNOWLEDGE_PDF_RASTERIZER_DPI_OVERRIDE: ${KNOWLEDGE_PDF_RASTERIZER_DPI-}
+      DIFY_ROOT_KNOWLEDGE_PDF_RASTERIZER_THUMBNAIL_DPI_OVERRIDE: ${KNOWLEDGE_PDF_RASTERIZER_THUMBNAIL_DPI-}
+      DIFY_ROOT_KNOWLEDGE_PDF_RASTERIZER_TIMEOUT_MS_OVERRIDE: ${KNOWLEDGE_PDF_RASTERIZER_TIMEOUT_MS-}
+      DIFY_ROOT_KNOWLEDGE_PDF_RASTERIZER_MAX_ASSETS_OVERRIDE: ${KNOWLEDGE_PDF_RASTERIZER_MAX_ASSETS-}
+      DIFY_ROOT_KNOWLEDGE_PDF_RASTERIZER_MAX_CONCURRENCY_OVERRIDE: ${KNOWLEDGE_PDF_RASTERIZER_MAX_CONCURRENCY-}
+      DIFY_INNER_API_URL: ${PLUGIN_DIFY_INNER_API_URL:-http://api:5001}
+      DIFY_INNER_API_KEY: ${PLUGIN_DIFY_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}
+      KNOWLEDGE_INTEGRATED_MODE_ENABLED: ${KNOWLEDGE_INTEGRATED_MODE_ENABLED:-true}
+      # Workspace staging uses KFS upload sessions for quota reservation and durable admission,
+      # while the document bytes remain in Dify's unified object storage.
+      KNOWLEDGE_DIRECT_UPLOAD_ENABLED: ${KNOWLEDGE_DIRECT_UPLOAD_ENABLED:-true}
+      NODE_ENV: production
+      PORT: 8787
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - "8787"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8787/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - default
+
+  # All five worker roles share the Dify Celery broker and need a worker image with the bundled
+  # KnowledgeFS engine. Only the optional knowledge-fs-celery profile starts them; set
+  # KNOWLEDGE_BACKGROUND_EXECUTION=celery in the root env first.
+  knowledge_fs_document_worker:
+    <<: *knowledge-fs-celery-worker
+    environment:
+      <<: *knowledge-fs-celery-environment
+      # Compose shares document capacity; Cloud deployments can use separate consumer pools.
+      CELERY_WORKER_QUEUES: knowledge_fs_document,knowledge_fs_priority_document
+      CELERY_WORKER_CONCURRENCY: ${KNOWLEDGE_FS_DOCUMENT_WORKER_CONCURRENCY:-2}
+  knowledge_fs_source_worker:
+    <<: *knowledge-fs-celery-worker
+    environment:
+      <<: *knowledge-fs-celery-environment
+      CELERY_WORKER_QUEUES: knowledge_fs_source
+      CELERY_WORKER_CONCURRENCY: ${KNOWLEDGE_FS_SOURCE_WORKER_CONCURRENCY:-1}
+  knowledge_fs_research_worker:
+    <<: *knowledge-fs-celery-worker
+    environment:
+      <<: *knowledge-fs-celery-environment
+      CELERY_WORKER_QUEUES: knowledge_fs_research
+      CELERY_WORKER_CONCURRENCY: ${KNOWLEDGE_FS_RESEARCH_WORKER_CONCURRENCY:-2}
+  knowledge_fs_maintenance_worker:
+    <<: *knowledge-fs-celery-worker
+    environment:
+      <<: *knowledge-fs-celery-environment
+      CELERY_WORKER_QUEUES: knowledge_fs_maintenance
+      CELERY_WORKER_CONCURRENCY: ${KNOWLEDGE_FS_MAINTENANCE_WORKER_CONCURRENCY:-1}
+  knowledge_fs_dispatch_worker:
+    <<: *knowledge-fs-celery-worker
+    environment:
+      <<: *knowledge-fs-celery-environment
+      CELERY_WORKER_QUEUES: knowledge_fs_dispatch
+      CELERY_WORKER_CONCURRENCY: ${KNOWLEDGE_FS_DISPATCH_WORKER_CONCURRENCY:-1}
+
+  # Dify Agent backend service.
+  agent_backend:
+    image: langgenius/dify-agent-backend:1.18.0
+    restart: always
+    env_file:
+      - path: ./envs/core-services/dify-agent.env
+        required: false
+      - path: ./envs/security.env
+        required: false
+      - path: ./envs/databases/redis.env
+        required: false
+      - ./.env
+    environment:
+      DIFY_AGENT_REDIS_URL: ${DIFY_AGENT_REDIS_URL:-redis://:${REDIS_PASSWORD:-difyai123456}@redis:6379/2}
+      DIFY_AGENT_PLUGIN_DAEMON_URL: ${DIFY_AGENT_PLUGIN_DAEMON_URL:-${PLUGIN_DAEMON_URL:-http://plugin_daemon:5002}}
+      DIFY_AGENT_PLUGIN_DAEMON_API_KEY: ${DIFY_AGENT_PLUGIN_DAEMON_API_KEY:-${PLUGIN_DAEMON_KEY:-lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi}}
+      DIFY_AGENT_INNER_API_URL: ${DIFY_AGENT_INNER_API_URL:-${PLUGIN_DIFY_INNER_API_URL:-http://api:5001}}
+      DIFY_AGENT_INNER_API_KEY: ${DIFY_AGENT_INNER_API_KEY:-${PLUGIN_DIFY_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}}
+      DIFY_AGENT_RUNTIME_BACKEND: ${DIFY_AGENT_RUNTIME_BACKEND:-local}
+      DIFY_AGENT_LOCAL_SANDBOX_ENDPOINT: ${DIFY_AGENT_LOCAL_SANDBOX_ENDPOINT:-${DIFY_AGENT_SHELLCTL_ENTRYPOINT:-http://local_sandbox:5004}}
+      DIFY_AGENT_LOCAL_SANDBOX_AUTH_TOKEN: ${DIFY_AGENT_LOCAL_SANDBOX_AUTH_TOKEN:-${DIFY_AGENT_SHELLCTL_AUTH_TOKEN:-}}
+      DIFY_AGENT_STUB_API_BASE_URL: ${DIFY_AGENT_STUB_API_BASE_URL:-http://agent_backend:5050/agent-stub}
+      DIFY_AGENT_SANDBOX_FILES_BASE_URL: ${DIFY_AGENT_SANDBOX_FILES_BASE_URL:-http://api:5001}
+      # This is security-sensitive: it derives the JWE encryption key for Agent Stub bearer tokens.
+      # Replace this development default in production.
+      # Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(32))'
+      DIFY_AGENT_SERVER_SECRET_KEY: ${DIFY_AGENT_SERVER_SECRET_KEY:-MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY}
+      DIFY_AGENT_API_TOKEN: ${DIFY_AGENT_API_TOKEN:-dify-agent-run-token-for-dev-only}
+    depends_on:
+      redis:
+        condition: service_started
+      plugin_daemon:
+        condition: service_started
+    networks:
+      - default
+      # Shared internal network with local_sandbox so agent_backend can reach it
+      # on port 5004 (shellctl entrypoint) while local_sandbox stays off `default`.
+      - agent_sandbox_network
+
+  # Dedicated SSRF proxy for the dify-agent local_sandbox.
+  agent_ssrf_proxy:
+    image: ubuntu/squid:latest
+    restart: always
+    volumes:
+      - ./ssrf_proxy/squid-agent.conf.template:/etc/squid/squid.conf.template
+      - ./ssrf_proxy/squid-common.conf.template:/etc/squid/dify_common.conf.template
+      - ./ssrf_proxy/docker-agent-entrypoint.sh:/docker-entrypoint-mount.sh
+    entrypoint:
+      [
+        "sh",
+        "-c",
+        "cp /docker-entrypoint-mount.sh /docker-entrypoint.sh && sed -i 's/\r$$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh && /docker-entrypoint.sh",
+      ]
+    environment:
+      HTTP_PORT: ${SSRF_HTTP_PORT:-3128}
+      COREDUMP_DIR: ${SSRF_COREDUMP_DIR:-/var/spool/squid}
+      SSRF_PROXY_ALLOW_PRIVATE_IPS: ${SSRF_PROXY_ALLOW_PRIVATE_IPS:-}
+      SSRF_PROXY_ALLOW_PRIVATE_DOMAINS: ${SSRF_PROXY_ALLOW_PRIVATE_DOMAINS:-}
+    networks:
+      # Needs to reach api and agent_backend as forward-proxy destinations.
+      - default
+      # Only agent_ssrf_proxy and local_sandbox share this internal network, so
+      # the local_sandbox can reach Squid without gaining a direct route to `api`.
+      - local_sandbox_proxy_network
+
   # ssrf_proxy server
   # for more information, please refer to
-  # https://docs.dify.ai/learn-more/faq/install-faq#18-why-is-ssrf-proxy-needed%3F
+  # https://docs.dify.ai/en/self-host/deploy/troubleshooting/docker-issues#why-is-ssrf-proxy-needed
   ssrf_proxy:
     image: ubuntu/squid:latest
     restart: always
     volumes:
       - ./ssrf_proxy/squid.conf.template:/etc/squid/squid.conf.template
+      - ./ssrf_proxy/squid-common.conf.template:/etc/squid/dify_common.conf.template
       - ./ssrf_proxy/docker-entrypoint.sh:/docker-entrypoint-mount.sh
     entrypoint:
       [
@@ -380,9 +907,8 @@ services:
       # pls clearly modify the squid env vars to fit your network environment.
       HTTP_PORT: ${SSRF_HTTP_PORT:-3128}
       COREDUMP_DIR: ${SSRF_COREDUMP_DIR:-/var/spool/squid}
-      REVERSE_PROXY_PORT: ${SSRF_REVERSE_PROXY_PORT:-8194}
-      SANDBOX_HOST: ${SSRF_SANDBOX_HOST:-sandbox}
-      SANDBOX_PORT: ${SANDBOX_PORT:-8194}
+      SSRF_PROXY_ALLOW_PRIVATE_IPS: ${SSRF_PROXY_ALLOW_PRIVATE_IPS:-}
+      SSRF_PROXY_ALLOW_PRIVATE_DOMAINS: ${SSRF_PROXY_ALLOW_PRIVATE_DOMAINS:-}
     networks:
       - ssrf_proxy_network
       - default
@@ -401,8 +927,8 @@ services:
       - ./certbot/update-cert.template.txt:/update-cert.template.txt
       - ./certbot/docker-entrypoint.sh:/docker-entrypoint.sh
     environment:
-      - CERTBOT_EMAIL=${CERTBOT_EMAIL}
-      - CERTBOT_DOMAIN=${CERTBOT_DOMAIN}
+      - CERTBOT_EMAIL=${CERTBOT_EMAIL:-}
+      - CERTBOT_DOMAIN=${CERTBOT_DOMAIN:-}
       - CERTBOT_OPTIONS=${CERTBOT_OPTIONS:-}
     entrypoint: ["/docker-entrypoint.sh"]
     command: ["tail", "-f", "/dev/null"]
@@ -444,6 +970,7 @@ services:
       NGINX_PROXY_READ_TIMEOUT: ${NGINX_PROXY_READ_TIMEOUT:-3600s}
       NGINX_PROXY_SEND_TIMEOUT: ${NGINX_PROXY_SEND_TIMEOUT:-3600s}
       NGINX_ENABLE_CERTBOT_CHALLENGE: ${NGINX_ENABLE_CERTBOT_CHALLENGE:-false}
+      NGINX_SOCKET_IO_UPSTREAM: ${NGINX_SOCKET_IO_UPSTREAM:-api_websocket:5001}
       CERTBOT_DOMAIN: ${CERTBOT_DOMAIN:-}
     depends_on:
       - api
@@ -454,7 +981,7 @@ services:
 
   # The Weaviate vector store.
   weaviate:
-    image: semitechnologies/weaviate:1.27.0
+    image: cr.weaviate.io/semitechnologies/weaviate:1.39.13
     profiles:
       - weaviate
     restart: always
@@ -936,9 +1463,42 @@ services:
     volumes:
       - ./volumes/unstructured:/app/data
 
+  # Dedicated KnowledgeFS parser for all remote document formats. Its page-parallel PDF policy
+  # and heavy-workload resource budget cannot change legacy Dify Unstructured ETL traffic.
+  knowledge_fs_unstructured:
+    image: downloads.unstructured.io/unstructured-io/unstructured-api@sha256:0df934a22e4e893cf15e7aeaf35c463ecc75937758a83099aefdc13041619a1d
+    profiles:
+      - knowledge-fs-unstructured
+    restart: always
+    env_file:
+      - path: ./envs/core-services/knowledge-fs-unstructured-service.defaults
+        required: true
+      - path: ./envs/core-services/knowledge-fs-unstructured.env
+        required: false
+    volumes:
+      - ./volumes/knowledge-fs-unstructured:/app/data
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 6G
+
 networks:
   # create a network between sandbox, api and ssrf_proxy, and can not access outside.
   ssrf_proxy_network:
+    driver: bridge
+    internal: true
+  # Internal network shared only by agent_ssrf_proxy and local_sandbox.
+  local_sandbox_proxy_network:
+    driver: bridge
+    internal: true
+  # shellctl control channel (agent_backend -> local_sandbox:5004).
+  # sandbox can access agent backend through this network, this is
+  # a known limitation.
+  #
+  # The agent runtime respects HTTP(S)_PROXY, but arbitrary code execution
+  # is still possible through the shellctl channel.
+  agent_sandbox_network:
     driver: bridge
     internal: true
   milvus:
@@ -950,3 +1510,5 @@ networks:
 volumes:
   oradata:
   dify_es01_data:
+  dify_agent_local_sandbox_home:
+  dify_agent_local_sandbox_workspace:
